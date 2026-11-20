@@ -67,6 +67,18 @@ heb_integrate <- function(
     c("abstain", "error"),
     what = "heb_integrate"
   )
+  # A node-level model (heb_fit_nodes) assigns cells to nodes, then applies its component models.
+  if (inherits(model, "heb_node_model")) {
+    return(.heb_integrate_nodes(
+      model,
+      x,
+      samples,
+      population,
+      transform,
+      unsupported,
+      sample_ids
+    ))
+  }
   .heb_validate(model)
   transform <- .heb_check_transform(transform)
   if (!identical(transform, model$transform)) {

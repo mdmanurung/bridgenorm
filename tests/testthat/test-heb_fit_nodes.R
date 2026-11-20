@@ -1,0 +1,254 @@
+# heb_fit_nodes(): node-level shifts recover planted per-cluster batch effects; fallback, order, seed, save/load.
+
+# Toy data: anchor b1 and batches b2, b3; two reference donors per batch plus one study sample in b2 and b3.
+# Cells come from two well-separated clusters on the mapping marker CD3 (A near 1, B near 4).
+# Marker M carries a batch shift that differs by cluster: b2 A +0.5, B -0.3; b3 A +0.2, B +0.2.
+# small_b3: the b3 references have 30 cells per cluster (same cell mix, fewer cells), so with min_cells 40
+# no b3 node summary survives while the b3 global summary (60 cells) does.
+nodes_sim <- function(seed = 11, small_b3 = FALSE) {
+  set.seed(seed)
+  shift <- list(
+    b1 = c(A = 0, B = 0),
+    b2 = c(A = 0.5, B = -0.3),
+    b3 = c(A = 0.2, B = 0.2)
+  )
+  base_m <- c(A = 2, B = 1)
+  donor_m <- c(D1 = 0, D2 = 0.1, S = 0)
+  centre_cd3 <- c(A = 1, B = 4)
+  samples <- rbind(
+    expand.grid(
+      donor = c("D1", "D2"),
+      batch = names(shift),
+      stringsAsFactors = FALSE
+    ),
+    data.frame(donor = "S", batch = c("b2", "b3"))
+  )
+  samples$sample_id <- paste(samples$donor, samples$batch, sep = "_")
+  samples$reference_id <- ifelse(
+    samples$donor == "S",
+    NA_character_,
+    samples$donor
+  )
+  cells <- do.call(
+    rbind,
+    lapply(seq_len(nrow(samples)), function(i) {
+      b <- samples$batch[i]
+      d <- samples$donor[i]
+      n <- if (small_b3 && b == "b3" && d != "S") 30 else 150
+      do.call(
+        rbind,
+        lapply(c("A", "B"), function(k) {
+          data.frame(
+            sample_id = samples$sample_id[i],
+            cluster = k,
+            CD3 = stats::rnorm(n, centre_cd3[[k]], 0.2),
+            M = stats::rnorm(
+              n,
+              base_m[[k]] + donor_m[[d]] + shift[[b]][[k]],
+              0.1
+            )
+          )
+        })
+      )
+    })
+  )
+  list(x = cells, samples = samples[, c("sample_id", "batch", "reference_id")])
+}
+
+fit_nodes_sim <- function(s, ...) {
+  args <- utils::modifyList(
+    list(
+      x = s$x[, c("sample_id", "CD3", "M")],
+      samples = s$samples,
+      population = rep("T", nrow(s$x)),
+      markers = c("CD3", "M"),
+      transform = list(name = "asinh", cofactor = 5),
+      anchor = "b1",
+      min_cells = 20,
+      unbridged = "stop",
+      method = "paired",
+      heb_settings = NULL,
+      grid = c(2, 1),
+      mapping_markers = "CD3",
+      train_cells = 200,
+      rlen = 50,
+      seed = 473,
+      assignment = "nearest",
+      fallback = "global"
+    ),
+    list(...)
+  )
+  do.call(heb_fit_nodes, args)
+}
+
+integrate_nodes_sim <- function(model, s) {
+  heb_integrate(
+    model,
+    s$x[, c("sample_id", "CD3", "M")],
+    s$samples,
+    population = rep("T", nrow(s$x)),
+    transform = list(name = "asinh", cofactor = 5),
+    unsupported = "abstain"
+  )
+}
+
+# Mean corrected M per study sample and cluster; the planted base values are A = 2, B = 1.
+study_means <- function(res, s) {
+  study <- s$x$sample_id %in% s$samples$sample_id[is.na(s$samples$reference_id)]
+  stats::aggregate(
+    res$x$M[study],
+    by = list(sample_id = s$x$sample_id[study], cluster = s$x$cluster[study]),
+    FUN = mean
+  )
+}
+
+test_that("paired node model recovers planted per-cluster shifts", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  res <- integrate_nodes_sim(fit_nodes_sim(s), s)
+  m <- study_means(res, s)
+  expected <- ifelse(m$cluster == "A", 2, 1)
+  expect_equal(m$x, expected, tolerance = 0.03, ignore_attr = TRUE)
+})
+
+test_that("the global CD3+ model cannot recover cluster-specific shifts (control)", {
+  s <- nodes_sim()
+  global <- heb_fit_paired(
+    s$x[, c("sample_id", "CD3", "M")],
+    s$samples,
+    population = rep("T", nrow(s$x)),
+    markers = c("CD3", "M"),
+    transform = list(name = "asinh", cofactor = 5),
+    anchor = "b1",
+    min_cells = 20,
+    unbridged = "stop"
+  )
+  res <- heb_integrate(
+    global,
+    s$x[, c("sample_id", "CD3", "M")],
+    s$samples,
+    population = rep("T", nrow(s$x)),
+    transform = list(name = "asinh", cofactor = 5),
+    unsupported = "abstain"
+  )
+  m <- study_means(res, s)
+  b2 <- m[m$sample_id == "S_b2", ]
+  # One shift of about +0.1 (mean of +0.5 and -0.3) leaves cluster A 0.4 high and B 0.4 low.
+  expect_gt(max(abs(b2$x - ifelse(b2$cluster == "A", 2, 1))), 0.3)
+})
+
+test_that("heb node model recovers planted per-cluster shifts", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  settings <- list(
+    hierarchy = data.frame(batch = c("b1", "b2", "b3"), study = "s1"),
+    variance_floor = 1e-8,
+    pool = "none",
+    anchor_effect = "fixed",
+    variance_prior = "boundary_avoiding",
+    residual_model = "known_plus_extra",
+    scale_model = "none",
+    moderation = "none",
+    moderation_centre = "fitted",
+    moderation_variance = "pev",
+    batch_shrinkage = "blup",
+    batch_shrinkage_centre = "study",
+    batch_shrinkage_group = "study",
+    batch_shrinkage_tau2 = "profile"
+  )
+  res <- integrate_nodes_sim(
+    fit_nodes_sim(s, method = "heb", heb_settings = settings),
+    s
+  )
+  m <- study_means(res, s)
+  expect_equal(
+    m$x,
+    ifelse(m$cluster == "A", 2, 1),
+    tolerance = 0.05,
+    ignore_attr = TRUE
+  )
+})
+
+test_that("a node without an effect falls back to the global shift or abstains", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim(small_b3 = TRUE)
+  b3 <- s$x$sample_id == "S_b3"
+
+  # Global fallback: b3's shift is +0.2 in both clusters, so the global shift recovers A = 2 and B = 1.
+  res <- integrate_nodes_sim(
+    fit_nodes_sim(s, fallback = "global", min_cells = 40),
+    s
+  )
+  m <- study_means(res, s)
+  b3_means <- m[m$sample_id == "S_b3", ]
+  expect_equal(
+    b3_means$x,
+    ifelse(b3_means$cluster == "A", 2, 1),
+    tolerance = 0.03,
+    ignore_attr = TRUE
+  )
+  expect_true(all(
+    res$actions$reason_code[res$actions$batch == "b3"] == "node_fallback_global"
+  ))
+
+  # Abstain: raw values kept and flagged.
+  res <- integrate_nodes_sim(
+    fit_nodes_sim(s, fallback = "abstain", min_cells = 40),
+    s
+  )
+  expect_identical(res$x$M[b3], s$x$M[b3])
+  expect_true(any(res$actions$action == "abstain"))
+})
+
+test_that("results follow cells, not row order", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  model <- fit_nodes_sim(s)
+  res <- integrate_nodes_sim(model, s)
+  perm <- sample(nrow(s$x))
+  shuffled <- s
+  shuffled$x <- s$x[perm, ]
+  res_shuffled <- integrate_nodes_sim(model, shuffled)
+  expect_equal(res_shuffled$x$M, res$x$M[perm])
+})
+
+test_that("one seed gives the same map; the seed is required", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  expect_identical(fit_nodes_sim(s)$map, fit_nodes_sim(s)$map)
+  args <- list(
+    x = s$x[, c("sample_id", "CD3", "M")],
+    samples = s$samples,
+    population = rep("T", nrow(s$x)),
+    markers = c("CD3", "M"),
+    transform = list(name = "asinh", cofactor = 5),
+    anchor = "b1",
+    min_cells = 20,
+    unbridged = "stop",
+    method = "paired",
+    heb_settings = NULL,
+    grid = c(2, 1),
+    mapping_markers = "CD3",
+    train_cells = 200,
+    rlen = 50,
+    assignment = "nearest",
+    fallback = "global"
+  )
+  expect_error(do.call(heb_fit_nodes, args), "seed")
+})
+
+test_that("a node model survives heb_save and heb_load", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  model <- fit_nodes_sim(s)
+  path <- tempfile(fileext = ".rds")
+  heb_save(model, path)
+  loaded <- heb_load(path)
+  expect_equal(
+    integrate_nodes_sim(loaded, s)$x,
+    integrate_nodes_sim(model, s)$x
+  )
+  tampered <- model
+  tampered$map$nodes[1, 1] <- tampered$map$nodes[1, 1] + 1
+  expect_error(heb_save(tampered, path), "Digest mismatch")
+})

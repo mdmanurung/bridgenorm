@@ -133,6 +133,15 @@
   invisible(model)
 }
 
+# Validate either model type.
+.heb_validate_any <- function(model) {
+  if (inherits(model, "heb_node_model")) {
+    .heb_validate_node(model)
+  } else {
+    .heb_validate(model)
+  }
+}
+
 #' @export
 print.heb_model <- function(x, ...) {
   cat(
@@ -175,14 +184,14 @@ print.heb_model <- function(x, ...) {
 #' \code{saveRDS()}. \code{heb_load()} reads it and checks the schema and
 #' digest again, so a changed file fails to load.
 #'
-#' @param model A \code{heb_model}.
+#' @param model A \code{heb_model} or \code{heb_node_model}.
 #' @param path File path.
 #' @return \code{heb_save()} returns \code{path} invisibly; \code{heb_load()}
 #'   returns the model.
 #' @export
 heb_save <- function(model, path) {
   .heb_stop_missing(c(model = missing(model), path = missing(path)))
-  .heb_validate(model)
+  .heb_validate_any(model)
   saveRDS(model, path)
   invisible(path)
 }
@@ -192,6 +201,6 @@ heb_save <- function(model, path) {
 heb_load <- function(path) {
   .heb_stop_missing(c(path = missing(path)))
   model <- readRDS(path)
-  .heb_validate(model)
+  .heb_validate_any(model)
   model
 }

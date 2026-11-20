@@ -1,3 +1,12 @@
+# heb 0.5.0
+
+* New `heb_fit_nodes()`: node-level correction (roadmap R8). A self-organising map (kohonen, now in
+  Suggests) is trained on reference cells after the global paired shift, and paired shift or `heb_fit()`
+  is fitted per map node. `heb_integrate()` assigns each cell to its nearest node and subtracts that
+  node's effect; a node without an effect takes the global effect (`fallback = "global"`) or keeps its
+  raw value (`"abstain"`). `heb_save()` and `heb_load()` accept the new `heb_node_model`. All settings
+  (`grid`, `mapping_markers`, `train_cells`, `rlen`, `seed`, `assignment`, `fallback`) are required.
+
 # heb 0.4.0
 
 * `heb_fit()` gains shrinkage across batches (roadmap R2), four required settings:

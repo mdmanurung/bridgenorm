@@ -1,0 +1,110 @@
+# Reference-noise report per batch (roadmap R7). Report only: no estimate depends on it.
+
+#' Report the reference noise of each batch
+#'
+#' For each batch, population and marker, summarises how noisy and how
+#' unusual the reference samples are, so the user can choose the anchor batch.
+#' It never chooses the anchor itself.
+#'
+#' @details
+#' Columns:
+#' \describe{
+#'   \item{\code{n_references}, \code{n_aliquots}}{Reference donors and
+#'     aliquots with at least \code{min_cells} cells.}
+#'   \item{\code{replicate_sd}}{Pooled within-donor SD of aliquot means:
+#'     \eqn{\sqrt{\sum (m_a - \bar m_r)^2 / (n_{aliquots} - n_{references})}}.
+#'     \code{NA} when no donor has two aliquots in the batch.}
+#'   \item{\code{cell_sd}}{Mean over aliquots of the SD of their cells.}
+#'   \item{\code{loo_z}}{Leave-one-batch-out z of the batch's donor mean,
+#'     averaged over donors: (donor mean in the batch - its mean over the other
+#'     batches) / its SD over the other batches. A donor needs two other
+#'     batches; \code{NA} when none has.}
+#' }
+#' A donor mean is the equal-weight mean of its aliquot means, as in
+#' \code{\link{heb_fit}}.
+#'
+#' @inheritParams heb_fit
+#' @return A tibble with one row per batch, population and marker.
+#' @seealso \code{\link{heb_fit}}, \code{\link{heb_bridges}}
+#' @export
+heb_reference_noise <- function(
+  x,
+  samples,
+  population,
+  markers,
+  transform,
+  min_cells,
+  sample_ids = NULL
+) {
+  .heb_stop_missing(c(
+    x = missing(x),
+    samples = missing(samples),
+    population = missing(population),
+    markers = missing(markers),
+    transform = missing(transform),
+    min_cells = missing(min_cells)
+  ))
+  .heb_check_transform(transform)
+  .heb_check_min_cells(min_cells)
+  d <- .heb_cells(x, samples, population, markers, sample_ids)
+  s <- .heb_summaries(d$xm, d$cells, as.integer(min_cells))$summ
+  if (nrow(s) == 0) {
+    stop("No reference summary has at least min_cells cells.", call. = FALSE)
+  }
+
+  # Aliquot level: replicate deviations within donor and cell SDs.
+  aliquot_level <- s |>
+    dplyr::mutate(
+      dev = .data$value - mean(.data$value),
+      .by = c("reference_id", "batch", "population", "marker")
+    ) |>
+    dplyr::summarise(
+      n_references = dplyr::n_distinct(.data$reference_id),
+      n_aliquots = dplyr::n(),
+      replicate_sd = if (dplyr::n() > dplyr::n_distinct(.data$reference_id)) {
+        sqrt(
+          sum(.data$dev^2) /
+            (dplyr::n() - dplyr::n_distinct(.data$reference_id))
+        )
+      } else {
+        NA_real_
+      },
+      cell_sd = mean(sqrt(.data$var_mean * .data$n_cells)),
+      .by = c("batch", "population", "marker")
+    )
+
+  # Donor level: leave-one-batch-out z per donor, then the mean over donors.
+  donor <- .heb_donor_level(s)
+  loo <- donor |>
+    dplyr::mutate(
+      z = vapply(
+        seq_along(.data$value),
+        function(i) {
+          rest <- .data$value[-i]
+          if (length(rest) < 2) {
+            NA_real_
+          } else {
+            (.data$value[[i]] - mean(rest)) / stats::sd(rest)
+          }
+        },
+        numeric(1)
+      ),
+      .by = c("reference_id", "population", "marker")
+    ) |>
+    dplyr::summarise(
+      loo_z = if (all(is.na(.data$z))) {
+        NA_real_
+      } else {
+        mean(.data$z, na.rm = TRUE)
+      },
+      .by = c("batch", "population", "marker")
+    )
+
+  dplyr::left_join(
+    aliquot_level,
+    loo,
+    by = c("batch", "population", "marker"),
+    relationship = "one-to-one"
+  ) |>
+    dplyr::arrange(.data$batch, .data$population, .data$marker)
+}

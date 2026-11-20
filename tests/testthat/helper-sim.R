@@ -60,7 +60,14 @@ fit_sim <- function(s, x = s$x, meta = s$meta, ...) {
       anchor_effect = "random",
       variance_prior = "none",
       residual_model = "estimated",
-      scale_model = "none"
+      scale_model = "none",
+      moderation = "none",
+      moderation_centre = "fitted",
+      moderation_variance = "pev",
+      batch_shrinkage = "blup",
+      batch_shrinkage_centre = "study",
+      batch_shrinkage_group = "study",
+      batch_shrinkage_tau2 = "profile"
     ),
     list(...)
   )

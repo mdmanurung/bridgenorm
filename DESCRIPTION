@@ -1,6 +1,6 @@
 Package: heb
 Title: Hierarchical Empirical Bayes Batch Correction from Reference Samples
-Version: 0.1.0
+Version: 0.4.0
 Authors@R:
     person("M. D.", "Manurung", email = "m.d.manurung@lumc.nl", role = c("aut", "cre"))
 Description: Estimates technical batch effects in cytometry data from
@@ -14,7 +14,6 @@ Description: Estimates technical batch effects in cytometry data from
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = FALSE)
-RoxygenNote: 7.3.2
 Depends:
     R (>= 4.1.0)
 Imports:
@@ -27,3 +26,4 @@ Suggests:
     lme4,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0

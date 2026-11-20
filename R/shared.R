@@ -61,9 +61,13 @@
     pops = pops,
     bp = bp,
     y = d$value,
-    X = stats::model.matrix(
-      ~ 0 + factor(paste(d$reference_id, d$population, sep = "\r"))
-    ),
+    # Donor-by-population indicators; outer() also covers one level, which model.matrix refuses.
+    X = outer(
+      paste(d$reference_id, d$population, sep = "\r"),
+      sort(unique(paste(d$reference_id, d$population, sep = "\r"))),
+      `==`
+    ) *
+      1,
     Z = list(Zs, Zb, Zw)
   )
 }

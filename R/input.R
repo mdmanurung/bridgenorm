@@ -238,6 +238,11 @@ heb_bridges <- function(samples, anchor) {
       call. = FALSE
     )
   }
+  .heb_bridge_table(batch, ref, anchor)
+}
+
+# Bridge table from per-row batch and reference ids (NA = not a reference).
+.heb_bridge_table <- function(batch, ref, anchor) {
   anchor_ids <- unique(ref[batch == anchor & !is.na(ref)])
   others <- sort(setdiff(unique(batch), anchor))
   shared <- lapply(others, function(b) {

@@ -30,9 +30,21 @@ model <- heb_fit(
   hierarchy = data.frame(batch = ..., study = ...), min_cells = 50,
   unbridged = "abstain", variance_floor = 1e-8, pool = "population",
   anchor_effect = "random", variance_prior = "boundary_avoiding",
-  residual_model = "known_plus_extra", scale_model = "none"
+  residual_model = "known_plus_extra", scale_model = "none",
+  moderation = "none", moderation_centre = "fitted", moderation_variance = "pev",
+  batch_shrinkage = "blup", batch_shrinkage_centre = "study",
+  batch_shrinkage_group = "study", batch_shrinkage_tau2 = "profile"
 )
 res <- heb_integrate(model, x, samples, labels, transform = model$transform, unsupported = "abstain")
+
+# Before choosing the anchor: reference noise per batch (report only).
+noise <- heb_reference_noise(x, samples, population = labels, markers = c("CD3", "CD4"),
+  transform = list(name = "asinh", cofactor = 6000), min_cells = 50)
+
+# The baseline every heb model must beat: paired shift, no shrinkage.
+paired <- heb_fit_paired(x, samples, population = labels, markers = c("CD3", "CD4"),
+  transform = list(name = "asinh", cofactor = 6000), anchor = "b1", min_cells = 50,
+  unbridged = "abstain")
 heb_save(model, "heb_model.rds")
 ```
 

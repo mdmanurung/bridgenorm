@@ -20,6 +20,13 @@ heb_fit(
   variance_prior,
   residual_model,
   scale_model,
+  moderation,
+  moderation_centre,
+  moderation_variance,
+  batch_shrinkage,
+  batch_shrinkage_centre,
+  batch_shrinkage_group,
+  batch_shrinkage_tau2,
   sample_ids = NULL
 )
 }
@@ -50,6 +57,11 @@ one row per batch.}
 \item{unbridged}{\code{"stop"} or \code{"abstain"}; see Details.}
 
 \item{variance_floor, pool, anchor_effect, variance_prior, residual_model, scale_model}{Model settings; see Details.}
+
+\item{moderation, moderation_centre, moderation_variance}{Moderation of each
+batch's effects across markers; see Details.}
+
+\item{batch_shrinkage, batch_shrinkage_centre, batch_shrinkage_group, batch_shrinkage_tau2}{Shrinkage across batches (roadmap R2); see Details.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}
@@ -100,6 +112,38 @@ absent), never the cell. Aliquot summaries with fewer than
     variance, or \code{"known_plus_extra"}: each summary's residual is its
     known sampling variance, var(cells) / n, plus one estimated extra
     variance.}
+  \item{\code{moderation}}{\code{"none"}, or shrink each batch's
+    marker effects (one population at a time) toward a centre:
+    \code{"standard_eb"} with weight \eqn{w = \tau^2/(\tau^2 + s^2)}, or
+    \code{"adaptive"} with \eqn{a = w + (1 - w) z^2/(1 + z^2)},
+    \eqn{z^2 = (y - \mu)^2/(s^2 + \tau^2)}, which shrinks outlying markers
+    less (ComBat-refQL, Sirchi and Zhang). \eqn{\tau^2} is fitted by profile
+    maximum likelihood over markers. Moderated fits keep \code{estimate_raw}
+    and add \code{moderation_weight}, \code{moderation_tau2},
+    \code{moderation_centre} and \code{moderation_status}; \code{se_donor}
+    and \code{df} stay those of the raw estimate. A batch with fewer than two
+    usable markers is left as it is.}
+  \item{\code{batch_shrinkage}}{\code{"blup"} keeps the mixed-model
+    BLUP. \code{"standard_eb"} or \code{"adaptive"} replace it by the
+    unshrunk paired contrast moderated across batches (the formulas of
+    \code{moderation}), with sampling variance = cell variance plus pooled
+    well variance (from batches with 2+ aliquots) over the aliquot counts.
+    The BLUP is kept as \code{estimate_blup}; \code{batch_shrinkage_weight}
+    and \code{batch_shrinkage_tau2} are added. Runs before
+    \code{moderation}.}
+  \item{\code{batch_shrinkage_centre}}{\code{"study"}: the study's
+    precision-weighted mean contrast; \code{"zero"}: the anchor.}
+  \item{\code{batch_shrinkage_group}}{\code{"study"}: batches of one
+    study share a prior; \code{"all"}: every non-anchor batch does.}
+  \item{\code{batch_shrinkage_tau2}}{\code{"profile"}: fitted by profile
+    maximum likelihood over the group; \code{"reml"}: the batch variance
+    component of the mixed model.}
+  \item{\code{moderation_centre}}{\code{"fitted"}: the precision-weighted
+    mean over markers, which keeps a shift shared by all markers;
+    \code{"zero"}: no batch effect.}
+  \item{\code{moderation_variance}}{\eqn{s^2}: \code{"pev"}, the squared
+    \code{se_donor} of the fit, or \code{"cell"}, the cell-only variance of
+    the contrast (aliquot var/n over the batch and anchor references).}
   \item{\code{scale_model}}{\code{"none"} for a pure shift, or
     \code{"log_sd"}: the same model is fitted to the log SD of each
     reference aliquot (known variance \eqn{1/(2(n-1))}), and the cells of
@@ -110,7 +154,7 @@ absent), never the cell. Aliquot summaries with fewer than
     get the shift only.}
   \item{\code{unbridged}}{A batch is bridged when it shares a reference id
     with the anchor batch (\code{\link{heb_bridges}}). \code{"stop"}
-    refuses the fit when any batch is unbridged. \code{"abstain"} fits
+    refuses the fit when any batch is unbridged after \code{min_cells}. \code{"abstain"} fits
     the data and drops the effects of unbridged batches, so
     \code{\link{heb_integrate}} leaves their cells raw and flags them.}
 }
@@ -120,6 +164,11 @@ the effect, from the prediction error covariance of Henderson's
 mixed-model equations. \code{df} is its Satterthwaite degrees of freedom
 from the inverse REML information, with components at the floor treated
 as known (\code{Inf} when all are).
+
+\strong{Population gate.} A (batch, population) whose reference donors
+share no donor with the anchor batch in that population gets no effect, so
+\code{\link{heb_integrate}} abstains on it. \code{min_cells} must be at
+least 2, so every summary has a sampling variance.
 
 \strong{Limits.} An additive shift on asinh data equals a gain change only
 for bright populations. A population with no reference summary in the
@@ -142,7 +191,10 @@ model <- heb_fit(
   hierarchy = data.frame(batch = batches, study = "s1"), min_cells = 10,
   unbridged = "stop", variance_floor = 1e-8, pool = "none",
   anchor_effect = "random", variance_prior = "boundary_avoiding",
-  residual_model = "known_plus_extra", scale_model = "none"
+  residual_model = "known_plus_extra", scale_model = "none",
+  moderation = "none", moderation_centre = "fitted", moderation_variance = "pev",
+  batch_shrinkage = "blup", batch_shrinkage_centre = "study",
+  batch_shrinkage_group = "study", batch_shrinkage_tau2 = "profile"
 )
 model$effects
 

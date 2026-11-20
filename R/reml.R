@@ -222,7 +222,27 @@
   )
   lapply(stats::setNames(names(designs), names(designs)), function(nm) {
     tk <- theta[[pool_key[[nm]]]]
-    .heb_blup(designs[[nm]], tk$theta, anchor, tk$cov_log)
+    z <- designs[[nm]]
+    # A singular system (e.g. one reference per batch with near-zero shifts) stops with its design named.
+    tryCatch(
+      c(.heb_blup(z, tk$theta, anchor, tk$cov_log), list(theta = tk$theta)),
+      error = function(e) {
+        stop(
+          sprintf(
+            paste(
+              "The mixed-model system for population '%s', marker '%s' is not positive definite",
+              "(variance components %s): %s. Try anchor_effect = \"fixed\" or",
+              "residual_model = \"known_plus_extra\"."
+            ),
+            z$d$population[[1]],
+            z$d$marker[[1]],
+            paste(signif(tk$theta, 3), collapse = ", "),
+            conditionMessage(e)
+          ),
+          call. = FALSE
+        )
+      }
+    )
   })
 }
 
@@ -295,6 +315,8 @@
     )
   }))
   # Centre: median of the batch's reference cells for that population, minus the shift.
+  # Only aliquots that passed min_cells count.
+  ref <- ref[ref_key %in% summ_key, , drop = FALSE]
   grp_key <- paste(ref$batch, ref$population, sep = "\r")
   grp <- split(ref$row, grp_key)
   centre <- dplyr::bind_rows(lapply(names(grp), function(k) {

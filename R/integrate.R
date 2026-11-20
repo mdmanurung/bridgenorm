@@ -117,6 +117,14 @@ heb_integrate <- function(
   # Extend a copy; the input model and its effects stay as they were.
   updated <- model
   if (nrow(new_eff) > 0) {
+    # A moderated model records new-batch paired rows as unmoderated.
+    if ("estimate_raw" %in% names(model$effects)) {
+      new_eff$estimate_raw <- new_eff$estimate
+      new_eff$moderation_weight <- 1
+      new_eff$moderation_tau2 <- NA_real_
+      new_eff$moderation_centre <- NA_real_
+      new_eff$moderation_status <- "new_batch_paired"
+    }
     added <- sort(unique(new_eff$batch))
     updated$effects <- dplyr::bind_rows(model$effects, new_eff)
     updated$known_batches <- sort(c(model$known_batches, added))

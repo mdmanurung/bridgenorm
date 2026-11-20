@@ -1,0 +1,29 @@
+Package: heb
+Title: Hierarchical Empirical Bayes Batch Correction from Reference Samples
+Version: 0.1.0
+Authors@R:
+    person("M. D.", "Manurung", email = "m.d.manurung@lumc.nl", role = c("aut", "cre"))
+Description: Estimates technical batch effects in cytometry data from
+    repeated reference samples with a linear mixed model per population and
+    marker: donor effects fixed, study and batch effects random, variance
+    components by restricted maximum likelihood. The correction of a batch is
+    the difference of its best linear unbiased prediction and that of an
+    anchor batch. Models are frozen with a digest and applied to new data
+    without changing earlier corrections. Ported from the 'heb' and
+    'heb_shared' engines of SpectraWeaveR.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = FALSE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.1.0)
+Imports:
+    dplyr (>= 1.1.0),
+    stats,
+    tibble (>= 3.1.0),
+    tools,
+    utils
+Suggests:
+    lme4,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

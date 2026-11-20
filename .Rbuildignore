@@ -1,2 +1,4 @@
 ^\.git$
 ^README\.Rmd$
+^plans$
+^experiments$

@@ -1,3 +1,25 @@
+# heb 0.5.1
+
+Fixes from an independent review (2026-11-21); corrected values are unchanged for valid inputs.
+
+* `heb_fit_nodes()` stops unless every mapping marker is one of `markers`. A mapping marker outside
+  them was mapped without the global pre-shift, so cells of a shifted batch landed in the wrong node.
+* `heb_integrate()` on a node model: a (batch, node, marker) row reads `apply / node_fallback_global`
+  only when every cell in it took the global effect. When the global model covers some of the node's
+  populations but not others, the row is `abstain / node_fallback_partial` (the other cells keep raw
+  values), so `unsupported = "error"` stops. It used to read `apply`.
+* `heb_integrate()` on a node model returns a copy that keeps the effects of batches estimated at
+  integrate time, with `parent_digest`, as for population models. It used to return the input model.
+* `heb_fit_nodes()` restores the caller's random number stream on exit, and stores the kohonen version
+  and its default settings in `settings$som`. The help page states that the map depends on row order
+  within a sample for a given seed.
+* Batch shrinkage adds `batch_shrinkage_status`: `"single_batch_group"` marks a group with too few
+  batches to moderate, which keeps its paired contrast (weight 1); the value is unchanged.
+* `n_aliquots` and `n_aliquots_anchor` count aliquots per donor; labels shared across donors were
+  counted once.
+* A missing batch or study label in `hierarchy` stops with a clear message, instead of a
+  "not positive definite" error.
+
 # heb 0.5.0
 
 * New `heb_fit_nodes()`: node-level correction (roadmap R8). A self-organising map (kohonen, now in

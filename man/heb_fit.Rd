@@ -129,8 +129,12 @@ absent), never the cell. Aliquot summaries with fewer than
     \code{moderation}), with sampling variance = cell variance plus pooled
     well variance (from batches with 2+ aliquots) over the aliquot counts.
     The BLUP is kept as \code{estimate_blup}; \code{batch_shrinkage_weight}
-    and \code{batch_shrinkage_tau2} are added. Runs before
-    \code{moderation}.}
+    and \code{batch_shrinkage_tau2} are added, with
+    \code{batch_shrinkage_status}: \code{"ok"}, or
+    \code{"single_batch_group"} when a group has too few batches to
+    moderate; with \code{centre = "study"}, a study with one non-anchor
+    batch keeps its paired contrast (weight 1).
+    Runs before \code{moderation}.}
   \item{\code{batch_shrinkage_centre}}{\code{"study"}: the study's
     precision-weighted mean contrast; \code{"zero"}: the anchor.}
   \item{\code{batch_shrinkage_group}}{\code{"study"}: batches of one

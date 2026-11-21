@@ -229,6 +229,7 @@
   paired$shrunk <- paired$estimate
   paired$weight <- 1
   paired$tau2 <- NA_real_
+  paired$status <- NA_character_
   for (ii in split(seq_len(nrow(paired)), paired$grp)) {
     y <- paired$estimate[ii]
     s2 <- paired$s2[ii]
@@ -257,6 +258,8 @@
     paired$shrunk[ii] <- r$estimate + mu_s
     paired$weight[ii] <- r$weight
     paired$tau2[ii] <- r$tau2
+    # Too few batches to moderate: a one-batch study group keeps its paired contrast (its own centre).
+    paired$status[ii] <- if (r$status == "ok") "ok" else "single_batch_group"
   }
   key_e <- paste(effects$batch, effects$population, effects$marker, sep = "\r")
   key_p <- paste(paired$batch, paired$population, paired$marker, sep = "\r")
@@ -264,6 +267,7 @@
   effects$estimate_blup <- effects$estimate
   effects$batch_shrinkage_weight <- paired$weight[m]
   effects$batch_shrinkage_tau2 <- paired$tau2[m]
+  effects$batch_shrinkage_status <- paired$status[m]
   hit <- !is.na(m)
   effects$estimate[hit] <- paired$shrunk[m[hit]]
   effects

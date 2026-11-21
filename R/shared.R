@@ -145,7 +145,9 @@
     )
     n_aliq <- mapply(
       function(b, k) {
-        length(unique(d$aliquot[d$batch == b & d$population == k]))
+        length(unique(paste(d$reference_id, d$aliquot, sep = "\r")[
+          d$batch == b & d$population == k
+        ]))
       },
       r$batch,
       r$population
@@ -153,7 +155,9 @@
     n_anc <- vapply(
       r$population,
       function(k) {
-        length(unique(d$aliquot[d$batch == anchor & d$population == k]))
+        length(unique(paste(d$reference_id, d$aliquot, sep = "\r")[
+          d$batch == anchor & d$population == k
+        ]))
       },
       integer(1)
     )

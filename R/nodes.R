@@ -35,7 +35,15 @@
 #' mix in every batch. If a batch's references miss a cell state, the global
 #' shift absorbs that mix difference and can move cells to the wrong node.
 #'
-#' Every argument that changes an estimate is required, with no default.
+#' The training cells are drawn by position within each reference sample, so
+#' for a given \code{seed} the map depends on the row order of \code{x}
+#' within a sample. \code{heb_fit_nodes()} restores the caller's random
+#' number stream on exit.
+#'
+#' Every argument that changes an estimate is required, with no default; the
+#' \pkg{kohonen} settings left at their defaults (topology, learning rate,
+#' radius, distance) and the \pkg{kohonen} version are stored in
+#' \code{settings$som}.
 #' Needs the \pkg{kohonen} package.
 #'
 #' @inheritParams heb_fit
@@ -48,7 +56,8 @@
 #' @param unbridged \code{"stop"} or \code{"abstain"}, as in
 #'   \code{\link{heb_fit}}.
 #' @param grid SOM grid as \code{c(xdim, ydim)}.
-#' @param mapping_markers Markers that define cell state for the map.
+#' @param mapping_markers Markers that define cell state for the map; each
+#'   must be one of \code{markers}, so it is pre-shifted.
 #' @param train_cells Maximum training cells per reference sample.
 #' @param rlen Number of SOM training passes (\code{kohonen::som}).
 #' @param seed Seed for the training-cell draw and the SOM.
@@ -165,6 +174,16 @@ heb_fit_nodes <- function(
       call. = FALSE
     )
   }
+  # The pre-shift corrects `markers` only, so a mapping marker outside them would be mapped raw.
+  uncorrected <- setdiff(mapping_markers, markers)
+  if (length(uncorrected) > 0) {
+    stop(
+      "Every one of 'mapping_markers' must be in 'markers', so the map sees pre-shifted values; not in 'markers': ",
+      paste(uncorrected, collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
 
   # Reference rows only: every fit and the map use them, as heb_fit() does.
   d <- .heb_cells(x, samples, population, markers, sample_ids)
@@ -191,7 +210,11 @@ heb_fit_nodes <- function(
     }
   }
   global_paired <- fit_one("paired", pop_ref, unbridged)
-  global <- if (method == "paired") global_paired else fit_one("heb", pop_ref, unbridged)
+  global <- if (method == "paired") {
+    global_paired
+  } else {
+    fit_one("heb", pop_ref, unbridged)
+  }
 
   # Map: trained on reference cells after the global paired shift.
   mapped_ref <- .heb_node_mapping_data(
@@ -202,6 +225,19 @@ heb_fit_nodes <- function(
     mapping_markers,
     transform,
     ids_ref
+  )$x
+  # Seed the draw and the SOM, then give the caller back their random number stream.
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  if (had_seed) {
+    old_seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+  }
+  on.exit(
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = globalenv())
+    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+      rm(".Random.seed", envir = globalenv())
+    },
+    add = TRUE
   )
   set.seed(seed)
   train_rows <- unlist(
@@ -247,7 +283,15 @@ heb_fit_nodes <- function(
         seed = seed,
         assignment = assignment,
         fallback = fallback,
-        heb_settings = heb_settings
+        heb_settings = heb_settings,
+        # kohonen settings left at their defaults, recorded so the map can be rebuilt.
+        som = list(
+          kohonen = as.character(utils::packageVersion("kohonen")),
+          topo = som$grid$topo,
+          alpha = som$alpha,
+          radius = som$radius,
+          dist_fcts = som$dist.fcts
+        )
       ),
       markers = markers,
       transform = global$transform,
@@ -258,6 +302,7 @@ heb_fit_nodes <- function(
       local = local,
       software = list(R = R.version.string, heb = .heb_pkg_version()),
       created = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
+      parent_digest = NA_character_,
       digest = NA_character_
     ),
     class = "heb_node_model"
@@ -267,6 +312,7 @@ heb_fit_nodes <- function(
 }
 
 # Mapping markers after the global paired shift; cells the global model abstains on stay raw.
+# Returns the mapped matrix (x) and the global paired model as heb_integrate() returned it (model).
 .heb_node_mapping_data <- function(
   global_paired,
   x,
@@ -291,7 +337,8 @@ heb_fit_nodes <- function(
     as.matrix(as.data.frame(res$x)[mapping_markers])
   }
   storage.mode(out) <- "double"
-  out
+  # The global model comes back too: it may carry effects of a batch estimated just now.
+  list(x = out, model = res$model)
 }
 
 # Index of the nearest node for each row of `mapped` (squared Euclidean distance, ties to the first node).
@@ -340,7 +387,7 @@ heb_fit_nodes <- function(
   .heb_validate_node(model)
   d <- .heb_cells(x, samples, population, model$markers, sample_ids)
   ids <- d$cells$sample_id
-  mapped <- .heb_node_mapping_data(
+  mapping <- .heb_node_mapping_data(
     model$global_paired,
     x,
     samples,
@@ -349,7 +396,7 @@ heb_fit_nodes <- function(
     transform,
     ids
   )
-  nodes <- model$map$labels[.heb_node_nearest(mapped, model$map)]
+  nodes <- model$map$labels[.heb_node_nearest(mapping$x, model$map)]
 
   local <- heb_integrate(
     model$local,
@@ -395,27 +442,57 @@ heb_fit_nodes <- function(
       global$actions$marker,
       sep = "\r"
     )
+    # Count, per action row, its cells and those that took the global effect (decided per cell population).
+    n_row <- integer(nrow(actions))
+    n_global <- integer(nrow(actions))
     for (m in model$markers) {
       i <- match(paste(d$cells$batch, nodes, m, sep = "\r"), act_key)
       g <- match(
         paste(d$cells$batch, d$cells$population, m, sep = "\r"),
         global_key
       )
-      use_global <- abstained[i] & global$actions$action[g] == "apply"
+      use_global <- abstained[i] &
+        !is.na(g) &
+        global$actions$action[g] == "apply"
+      use_global[is.na(use_global)] <- FALSE
       out[use_global, m] <- global_xm[use_global, m]
+      n_row <- n_row + tabulate(i[!is.na(i)], nbins = nrow(actions))
+      n_global <- n_global + tabulate(i[use_global], nbins = nrow(actions))
     }
-    # A node without an effect is reported as a fallback when the batch has a global effect for that marker.
+    # A row with no cells is a fallback when its batch has a global effect for that marker.
     has_global <- paste(actions$batch, actions$marker) %in%
       paste(
         global$actions$batch[global$actions$action == "apply"],
         global$actions$marker[global$actions$action == "apply"]
       )
-    fb <- abstained & has_global
+    fb <- abstained &
+      ((n_row > 0 & n_global == n_row) | (n_row == 0 & has_global))
+    partial <- abstained & n_global > 0 & n_global < n_row
     actions$action[fb] <- "apply"
     actions$reason_code[fb] <- "node_fallback_global"
     actions$reason[
       fb
     ] <- "Node has no effect in this batch; the global effect was applied."
+    actions$reason_code[partial] <- "node_fallback_partial"
+    actions$reason[partial] <- sprintf(
+      "Node has no effect in this batch; %d of %d cells took the global effect, the rest (populations without a global effect) kept raw values.",
+      n_global[partial],
+      n_row[partial]
+    )
+  }
+
+  # Keep the component models as heb_integrate() returned them: they carry effects of new batches.
+  updated <- model
+  updated$global_paired <- mapping$model
+  updated$global <- if (model$method == "paired") {
+    mapping$model
+  } else {
+    global$model
+  }
+  updated$local <- local$model
+  if (!identical(updated, model)) {
+    updated$parent_digest <- model$digest
+    updated$digest <- .heb_digest(updated)
   }
 
   if (unsupported == "error" && any(actions$action == "abstain")) {
@@ -437,7 +514,7 @@ heb_fit_nodes <- function(
     list(
       x = .heb_restore(x, out, model$markers),
       actions = actions,
-      model = model,
+      model = updated,
       nodes = nodes,
       excluded = local$excluded,
       aliquot_source = d$aliquot_source

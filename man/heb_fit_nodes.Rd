@@ -59,7 +59,8 @@ scale \code{x} is on.}
 
 \item{grid}{SOM grid as \code{c(xdim, ydim)}.}
 
-\item{mapping_markers}{Markers that define cell state for the map.}
+\item{mapping_markers}{Markers that define cell state for the map; each
+must be one of \code{markers}, so it is pre-shifted.}
 
 \item{train_cells}{Maximum training cells per reference sample.}
 
@@ -112,7 +113,15 @@ The global pre-shift assumes the reference donor has the same cell-state
 mix in every batch. If a batch's references miss a cell state, the global
 shift absorbs that mix difference and can move cells to the wrong node.
 
-Every argument that changes an estimate is required, with no default.
+The training cells are drawn by position within each reference sample, so
+for a given \code{seed} the map depends on the row order of \code{x}
+within a sample. \code{heb_fit_nodes()} restores the caller's random
+number stream on exit.
+
+Every argument that changes an estimate is required, with no default; the
+\pkg{kohonen} settings left at their defaults (topology, learning rate,
+radius, distance) and the \pkg{kohonen} version are stored in
+\code{settings$som}.
 Needs the \pkg{kohonen} package.
 }
 \seealso{

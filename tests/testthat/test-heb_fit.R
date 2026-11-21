@@ -218,3 +218,20 @@ test_that("log_sd correction evens the spread, and scale_model = 'none' is the p
   expect_false("scale" %in% names(plain$effects))
   expect_equal(plain$effects$estimate, fit$effects$estimate)
 })
+
+# Review fixes for 0.5.1 (plans/2026-11-21_heb-0.5.1-fixes.md) -----------------
+
+test_that("n_aliquots counts aliquots per donor, not shared labels", {
+  s <- heb_sim()
+  # Label aliquots "1" and "2" within each donor and batch: 3 donors x 2 = 6 aliquots per batch.
+  s$meta$aliquot <- sub(".*_", "", s$meta$sample_id)
+  eff <- fit_sim(s)$effects
+  expect_true(all(eff$n_aliquots == 6))
+  expect_true(all(eff$n_aliquots_anchor == 6))
+})
+
+test_that("a missing study label stops with a clear message", {
+  s <- heb_sim()
+  s$hierarchy$study[2] <- NA
+  expect_error(fit_sim(s), "study")
+})

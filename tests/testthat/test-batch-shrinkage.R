@@ -123,3 +123,108 @@ test_that("REML tau2 uses the fitted batch variance", {
   shrunk <- eff$batch %in% c("s2_r1", "s2_r2", "s3_r1", "s3_r2")
   expect_true(all(is.finite(eff$batch_shrinkage_tau2[shrunk])))
 })
+
+# Review fixes for 0.5.1 (plans/2026-11-21_heb-0.5.1-fixes.md) -----------------
+
+test_that("a study with one non-anchor batch is labelled, not silently left unshrunk", {
+  s <- one_donor_sim()
+  eff <- fit_shrink(s, "standard_eb", centre = "study", group = "study")
+  # s1 holds the anchor s1_r1, so s1_r2 is alone in its group; s2 and s3 have two batches each.
+  expect_equal(
+    eff$batch_shrinkage_status[eff$batch == "s1_r2"],
+    "single_batch_group"
+  )
+  expect_equal(eff$batch_shrinkage_weight[eff$batch == "s1_r2"], 1)
+  expect_true(all(
+    eff$batch_shrinkage_status[
+      eff$batch %in% c("s2_r1", "s2_r2", "s3_r1", "s3_r2")
+    ] ==
+      "ok"
+  ))
+})
+
+test_that("REML tau2 equals the lme4 batch variance", {
+  skip_if_not_installed("lme4")
+  s <- heb_sim()
+  eff <- fit_sim(
+    s,
+    batch_shrinkage = "standard_eb",
+    batch_shrinkage_tau2 = "reml"
+  )$effects
+  d <- s$meta
+  d$value <- vapply(
+    d$sample_id,
+    function(id) mean(s$x$m1[s$x$sample_id == id]),
+    numeric(1)
+  )
+  d <- merge(d, s$hierarchy, by = "batch")
+  fit <- lme4::lmer(
+    value ~ 0 + donor + (1 | study) + (1 | batch),
+    data = d,
+    REML = TRUE,
+    control = lme4::lmerControl(
+      check.conv.grad = lme4::.makeCC("ignore", tol = 1e-3)
+    )
+  )
+  want <- as.data.frame(lme4::VarCorr(fit))
+  want <- want$vcov[want$grp == "batch"]
+  got <- unique(stats::na.omit(eff$batch_shrinkage_tau2))
+  expect_equal(got, want, tolerance = 1e-3)
+})
+
+test_that("shrinkage variances use donors and unequal aliquot counts as written by hand", {
+  # Two donors; batch s2_r1 keeps one aliquot per donor, every other batch two.
+  s <- heb_sim()
+  s <- subset_sim(
+    s,
+    s$meta$donor %in%
+      c("D1", "D2") &
+      !(s$meta$batch == "s2_r1" & grepl("_2$", s$meta$sample_id))
+  )
+  eff <- fit_sim(
+    s,
+    batch_shrinkage = "standard_eb",
+    batch_shrinkage_centre = "zero",
+    batch_shrinkage_group = "all",
+    batch_shrinkage_tau2 = "reml"
+  )$effects
+  meta <- s$meta
+  meta$am <- vapply(
+    meta$sample_id,
+    function(id) mean(s$x$m1[s$x$sample_id == id]),
+    numeric(1)
+  )
+  meta$vm <- vapply(
+    meta$sample_id,
+    function(id) {
+      v <- s$x$m1[s$x$sample_id == id]
+      stats::var(v) / length(v)
+    },
+    numeric(1)
+  )
+  # Donor means per batch, then the paired contrast to the anchor averaged over the 2 donors.
+  dm <- tapply(meta$am, list(meta$batch, meta$donor), mean)
+  y <- rowMeans(dm - matrix(dm["s1_r1", ], nrow(dm), 2, byrow = TRUE))
+  # Cell variance of a batch's donor mean: sum of aliquot variances / n_aliquots^2, averaged over donors / 2.
+  cv <- tapply(meta$vm, list(meta$batch, meta$donor), function(v) {
+    sum(v) / length(v)^2
+  })
+  cell <- rowSums(cv) / 4
+  rep_ss <- sum(
+    tapply(meta$am, list(meta$batch, meta$donor), function(v) {
+      sum((v - mean(v))^2)
+    }),
+    na.rm = TRUE
+  )
+  rep_df <- nrow(meta) - length(dm)
+  well <- max(rep_ss / rep_df - mean(meta$vm), 0)
+  k <- c(table(meta$batch)) / 2
+  nb <- names(y) != "s1_r1"
+  s2 <- cell[nb] +
+    cell[["s1_r1"]] +
+    well * (1 / k[names(y)[nb]] + 1 / k[["s1_r1"]]) / 2
+  tau2 <- unique(stats::na.omit(eff$batch_shrinkage_tau2))
+  want <- eb_given(y[nb], s2, tau2, 0)$standard
+  got <- eff$estimate[match(names(y)[nb], eff$batch)]
+  expect_equal(unname(got), unname(want), tolerance = 1e-8)
+})

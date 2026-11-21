@@ -252,3 +252,104 @@ test_that("a node model survives heb_save and heb_load", {
   tampered$map$nodes[1, 1] <- tampered$map$nodes[1, 1] + 1
   expect_error(heb_save(tampered, path), "Digest mismatch")
 })
+
+# Review fixes for 0.5.1 (plans/2026-11-21_heb-0.5.1-fixes.md) -----------------
+
+test_that("mapping markers outside the corrected markers are refused", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  expect_error(
+    fit_nodes_sim(s, markers = "M", mapping_markers = "CD3"),
+    "mapping_markers"
+  )
+})
+
+test_that("a node row reads 'apply' only when every cell in it got the global effect", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim(small_b3 = TRUE)
+  # Populations P and Q alternate by row, so every node holds both.
+  pop <- rep_len(c("P", "Q"), nrow(s$x))
+  batch <- s$samples$batch[match(s$x$sample_id, s$samples$sample_id)]
+  is_ref <- !is.na(s$samples$reference_id[match(
+    s$x$sample_id,
+    s$samples$sample_id
+  )])
+  # Keep 5 Q cells per b3 reference sample: no global (b3, Q) effect, while (b3, P) keeps 30.
+  rank_in_group <- stats::ave(
+    seq_along(pop),
+    s$x$sample_id,
+    pop,
+    FUN = seq_along
+  )
+  keep <- !(batch == "b3" & is_ref & pop == "Q" & rank_in_group > 5)
+  s$x <- s$x[keep, ]
+  pop <- pop[keep]
+  batch <- batch[keep]
+  # min_cells 25: each b3 node has 20 cells per sample (15 P + 5 Q), so no node effect; global P has 30.
+  model <- fit_nodes_sim(s, population = pop, min_cells = 25)
+  res <- heb_integrate(
+    model,
+    s$x[, c("sample_id", "CD3", "M")],
+    s$samples,
+    population = pop,
+    transform = list(name = "asinh", cofactor = 5),
+    unsupported = "abstain"
+  )
+  b3_rows <- res$actions[
+    res$actions$batch == "b3" & res$actions$marker == "M",
+  ]
+  expect_true(all(b3_rows$action == "abstain"))
+  expect_true(all(b3_rows$reason_code == "node_fallback_partial"))
+  # Every b3 Q cell keeps its raw M; no b3 P cell does.
+  raw <- res$x$M == s$x$M
+  expect_equal(
+    sum(raw[batch == "b3" & pop == "Q"]),
+    sum(batch == "b3" & pop == "Q")
+  )
+  expect_equal(sum(raw[batch == "b3" & pop == "P"]), 0)
+  expect_error(
+    heb_integrate(
+      model,
+      s$x[, c("sample_id", "CD3", "M")],
+      s$samples,
+      population = pop,
+      transform = list(name = "asinh", cofactor = 5),
+      unsupported = "error"
+    ),
+    "cannot be corrected"
+  )
+})
+
+test_that("a node model keeps the effects of a batch it estimated at integrate time", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  old <- s$samples$batch != "b3"
+  s_old <- list(
+    x = s$x[s$x$sample_id %in% s$samples$sample_id[old], ],
+    samples = s$samples[old, ]
+  )
+  model <- fit_nodes_sim(s_old)
+  first <- integrate_nodes_sim(model, s)
+  expect_identical(first$model$parent_digest, model$digest)
+  # The b3 study sample alone, with the returned model: corrected to the planted base A = 2, B = 1.
+  s_study <- list(x = s$x[s$x$sample_id == "S_b3", ], samples = s$samples)
+  second <- integrate_nodes_sim(first$model, s_study)
+  expect_true(all(second$actions$action == "apply"))
+  m <- study_means(second, s_study)
+  expect_equal(
+    m$x,
+    ifelse(m$cluster == "A", 2, 1),
+    tolerance = 0.03,
+    ignore_attr = TRUE
+  )
+})
+
+test_that("heb_fit_nodes() leaves the caller's random number stream alone", {
+  skip_if_not_installed("kohonen")
+  s <- nodes_sim()
+  set.seed(1)
+  want <- stats::runif(1)
+  set.seed(1)
+  invisible(fit_nodes_sim(s))
+  expect_identical(stats::runif(1), want)
+})

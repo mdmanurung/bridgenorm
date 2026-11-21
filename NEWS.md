@@ -1,3 +1,17 @@
+# heb 0.6.0
+
+* New `heb_fit_node_quantile()`: two-pass node correction with per-node quantile maps (tusoskill run
+  heb_nodes_20261121, candidate c016; decisions T1-T3). Pass 1 is `heb_fit_nodes()`; pass 2 refits the
+  map on the shifted reference cells and, in each node where a batch and the anchor both have at least
+  `min_cells` reference cells pooled over wells, maps the batch's marker quantiles onto the anchor's
+  (linear interpolation, a constant shift beyond the outer quantiles). Other cells take the pass-2 node
+  shift. `quantile_probs` and `tail` are required, like every `heb_fit_nodes()` setting.
+  On the data set A lockbox simulation it lowered the worst-pair EMD from 0.257 to 0.198 (node-specific
+  shifts) and from 0.763 to 0.585 (smooth shifts) against the 6x6 node shift.
+* `heb_integrate()` applies the new `heb_node_quantile_model`; its `actions` carry a `pass` column, and
+  pass-2 rows mapped by quantiles read `apply / node_quantile`. `heb_save()` and `heb_load()` accept it.
+* `heb_fit_nodes()` and its corrections are unchanged.
+
 # heb 0.5.1
 
 Fixes from an independent review (2026-11-21); corrected values are unchanged for valid inputs.

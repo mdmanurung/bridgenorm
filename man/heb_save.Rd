@@ -10,7 +10,8 @@ heb_save(model, path)
 heb_load(path)
 }
 \arguments{
-\item{model}{A \code{heb_model} or \code{heb_node_model}.}
+\item{model}{A \code{heb_model}, \code{heb_node_model} or
+\code{heb_node_quantile_model}.}
 
 \item{path}{File path.}
 }

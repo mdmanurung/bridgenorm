@@ -67,6 +67,18 @@ heb_integrate <- function(
     c("abstain", "error"),
     what = "heb_integrate"
   )
+  # A two-pass quantile model (heb_fit_node_quantile) applies its node passes and quantile maps.
+  if (inherits(model, "heb_node_quantile_model")) {
+    return(.heb_integrate_node_quantile(
+      model,
+      x,
+      samples,
+      population,
+      transform,
+      unsupported,
+      sample_ids
+    ))
+  }
   # A node-level model (heb_fit_nodes) assigns cells to nodes, then applies its component models.
   if (inherits(model, "heb_node_model")) {
     return(.heb_integrate_nodes(

@@ -135,7 +135,9 @@
 
 # Validate either model type.
 .heb_validate_any <- function(model) {
-  if (inherits(model, "heb_node_model")) {
+  if (inherits(model, "heb_node_quantile_model")) {
+    .heb_validate_node_quantile(model)
+  } else if (inherits(model, "heb_node_model")) {
     .heb_validate_node(model)
   } else {
     .heb_validate(model)
@@ -184,7 +186,8 @@ print.heb_model <- function(x, ...) {
 #' \code{saveRDS()}. \code{heb_load()} reads it and checks the schema and
 #' digest again, so a changed file fails to load.
 #'
-#' @param model A \code{heb_model} or \code{heb_node_model}.
+#' @param model A \code{heb_model}, \code{heb_node_model} or
+#'   \code{heb_node_quantile_model}.
 #' @param path File path.
 #' @return \code{heb_save()} returns \code{path} invisibly; \code{heb_load()}
 #'   returns the model.

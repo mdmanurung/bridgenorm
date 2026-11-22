@@ -1,3 +1,12 @@
+# heb 0.7.0
+
+* `heb_fit_node_quantile()` gains a required `shrink_k`: each non-anchor (batch, pass-2 node) offset curve
+  (batch minus anchor quantiles) is pulled toward the batch-wide offset curve with weight n / (n + shrink_k),
+  n = the batch's reference cells in the node (tusoskill run heb_confounded_20261121, candidate c018;
+  decision TR3k, shrink_k = 300). `shrink_k = 0` reproduces 0.6.0. **Breaking:** calls without `shrink_k`
+  now stop. In the round 3 lockbox (sim seeds 1004-1005, SOM seeds 473-475) shrink_k = 300 lowered recovery
+  distance on every seed (-0.009 to -0.013) and RMSE to truth, with no expression harm.
+
 # heb 0.6.0
 
 * New `heb_fit_node_quantile()`: two-pass node correction with per-node quantile maps (tusoskill run

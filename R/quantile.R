@@ -24,6 +24,13 @@
 #'     reference cells pooled over its reference samples, the quantiles at
 #'     \code{quantile_probs} of every marker (\code{stats::quantile()},
 #'     type 7) are stored.
+#'   \item Shrinkage: in each such (batch, node) of a non-anchor batch whose
+#'     node also has anchor quantiles, the offset curve (batch minus anchor
+#'     quantiles) is pulled toward the batch-wide offset curve (quantiles of
+#'     all the batch's pass-1 reference cells minus the anchor's), with weight
+#'     \eqn{n / (n + shrink_k)} on the node's own curve, \eqn{n} being the
+#'     batch's reference cells in the node. \code{shrink_k = 0} keeps the
+#'     fitted tables.
 #' }
 #' At integrate time, pass 1 is applied, then each cell is assigned to its
 #' nearest pass-2 node. If its batch and the anchor both have quantiles in
@@ -41,6 +48,10 @@
 #' @param quantile_probs Increasing probabilities in (0, 1), at least two,
 #'   at which batch and anchor quantiles are matched.
 #' @param tail Rule beyond the outer quantiles; only \code{"shift"}.
+#' @param shrink_k Non-negative number of cells: the pseudo-count of the
+#'   shrinkage toward the batch-wide offset curve. Larger values borrow more;
+#'   \code{0} turns shrinkage off. No default: it changes the estimates
+#'   (decision TR3k used 300).
 #' @return A \code{heb_node_quantile_model}: a list with
 #'   \code{schema_version}, \code{settings}, \code{markers},
 #'   \code{transform}, \code{anchor}, \code{pass1} and \code{pass2} (frozen
@@ -69,6 +80,7 @@ heb_fit_node_quantile <- function(
   fallback,
   quantile_probs,
   tail,
+  shrink_k,
   sample_ids = NULL
 ) {
   .heb_stop_missing(c(
@@ -90,7 +102,8 @@ heb_fit_node_quantile <- function(
     assignment = missing(assignment),
     fallback = missing(fallback),
     quantile_probs = missing(quantile_probs),
-    tail = missing(tail)
+    tail = missing(tail),
+    shrink_k = missing(shrink_k)
   ))
   .heb_check_choice(tail, "tail", "shift", what = "heb_fit_node_quantile")
   if (
@@ -104,6 +117,14 @@ heb_fit_node_quantile <- function(
       "'quantile_probs' must be at least two increasing probabilities in (0, 1).",
       call. = FALSE
     )
+  }
+  if (
+    !is.numeric(shrink_k) ||
+      length(shrink_k) != 1 ||
+      !is.finite(shrink_k) ||
+      shrink_k < 0
+  ) {
+    stop("'shrink_k' must be one finite number >= 0.", call. = FALSE)
   }
 
   # Reference rows only, as heb_fit_nodes() uses.
@@ -158,8 +179,9 @@ heb_fit_node_quantile <- function(
     seq_along(nodes),
     paste(d$cells$batch[ref_rows], nodes, sep = "\r")
   )
-  groups <- groups[lengths(groups) >= min_cells]
-  quantiles <- lapply(groups, function(i) {
+  n_cells <- lengths(groups)
+  groups <- groups[n_cells >= min_cells]
+  q_table <- function(i) {
     q <- apply(
       x1m[i, , drop = FALSE],
       2,
@@ -169,7 +191,27 @@ heb_fit_node_quantile <- function(
       type = 7
     )
     matrix(q, nrow = length(quantile_probs), dimnames = list(NULL, markers))
-  })
+  }
+  quantiles <- lapply(groups, q_table)
+
+  # Shrink each non-anchor node offset curve toward its batch-wide offset curve (TR3k).
+  if (shrink_k > 0) {
+    ref_batch <- d$cells$batch[ref_rows]
+    batch_q <- lapply(split(seq_along(ref_batch), ref_batch), q_table)
+    shrunk <- quantiles
+    for (g in names(quantiles)) {
+      b <- sub("\r.*", "", g)
+      qa <- quantiles[[paste(anchor, sub(".*\r", "", g), sep = "\r")]]
+      if (b == anchor || is.null(qa)) {
+        next
+      }
+      w <- n_cells[[g]] / (n_cells[[g]] + shrink_k)
+      shrunk[[g]] <- qa +
+        w * (quantiles[[g]] - qa) +
+        (1 - w) * (batch_q[[b]] - batch_q[[anchor]])
+    }
+    quantiles <- shrunk
+  }
 
   model <- structure(
     list(
@@ -178,7 +220,8 @@ heb_fit_node_quantile <- function(
         quantile_probs = quantile_probs,
         tail = tail,
         min_cells = min_cells,
-        quantile_type = 7L
+        quantile_type = 7L,
+        shrink_k = shrink_k
       ),
       markers = markers,
       transform = pass1$transform,

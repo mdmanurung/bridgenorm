@@ -24,6 +24,7 @@ heb_fit_node_quantile(
   fallback,
   quantile_probs,
   tail,
+  shrink_k,
   sample_ids = NULL
 )
 }
@@ -79,6 +80,11 @@ at which batch and anchor quantiles are matched.}
 
 \item{tail}{Rule beyond the outer quantiles; only \code{"shift"}.}
 
+\item{shrink_k}{Non-negative number of cells: the pseudo-count of the
+shrinkage toward the batch-wide offset curve. Larger values borrow more;
+\code{0} turns shrinkage off. No default: it changes the estimates
+(decision TR3k used 300).}
+
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}
 }
@@ -109,6 +115,13 @@ Steps, all on reference cells only:
     reference cells pooled over its reference samples, the quantiles at
     \code{quantile_probs} of every marker (\code{stats::quantile()},
     type 7) are stored.
+  \item Shrinkage: in each such (batch, node) of a non-anchor batch whose
+    node also has anchor quantiles, the offset curve (batch minus anchor
+    quantiles) is pulled toward the batch-wide offset curve (quantiles of
+    all the batch's pass-1 reference cells minus the anchor's), with weight
+    \eqn{n / (n + shrink_k)} on the node's own curve, \eqn{n} being the
+    batch's reference cells in the node. \code{shrink_k = 0} keeps the
+    fitted tables.
 }
 At integrate time, pass 1 is applied, then each cell is assigned to its
 nearest pass-2 node. If its batch and the anchor both have quantiles in

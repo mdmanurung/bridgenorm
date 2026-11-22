@@ -60,7 +60,8 @@ fit_quantile_sim <- function(s, ...) {
       assignment = "nearest",
       fallback = "global",
       quantile_probs = seq(0.025, 0.975, length.out = 21),
-      tail = "shift"
+      tail = "shift",
+      shrink_k = 0
     ),
     list(...)
   )
@@ -134,7 +135,8 @@ test_that("a (batch, node) below min_cells pooled reference cells keeps the pass
     assignment = "nearest",
     fallback = "global",
     quantile_probs = seq(0.025, 0.975, length.out = 21),
-    tail = "shift"
+    tail = "shift",
+    shrink_k = 0
   )
   model <- do.call(heb_fit_node_quantile, args)
   res <- heb_integrate(
@@ -172,8 +174,60 @@ test_that("every estimate-changing argument is required", {
     "quantile_probs"
   )
   expect_error(fit_quantile_sim(s, tail = "linear"), "tail")
+  expect_error(fit_quantile_sim(s, shrink_k = NULL), "shrink_k")
+  expect_error(fit_quantile_sim(s, shrink_k = -1), "shrink_k")
   expect_error(
     fit_quantile_sim(s, quantile_probs = c(0.5, 0.2)),
     "quantile_probs"
+  )
+})
+
+test_that("shrink_k pulls each node offset curve toward the batch-wide curve by n / (n + shrink_k)", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  raw <- fit_quantile_sim(s, shrink_k = 0)
+  shrunk <- fit_quantile_sim(s, shrink_k = 300)
+  # Expected tables from first principles: pass-1-corrected reference cells, their pass-2 nodes,
+  # stats::quantile() per batch and per (batch, node), then the shrinkage formula.
+  probs <- seq(0.025, 0.975, length.out = 21)
+  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
+  integ <- function(m, cells) {
+    heb_integrate(m, cells, s$samples, rep("T", nrow(cells)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+  }
+  x1 <- integ(raw$pass1, ref)$x
+  nodes <- integ(raw$pass2, x1)$nodes
+  batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
+  q_of <- function(i) sapply(c("CD3", "M"), function(m) stats::quantile(x1[[m]][i], probs, names = FALSE, type = 7))
+  glob_off <- q_of(batch == "b2") - q_of(batch == "b1")
+  for (node in unique(nodes)) {
+    g <- paste("b2", node, sep = "\r")
+    ga <- paste("b1", node, sep = "\r")
+    skip_if(is.null(raw$quantiles[[g]]) || is.null(raw$quantiles[[ga]]))
+    n <- sum(batch == "b2" & nodes == node)
+    w <- n / (n + 300)
+    expected <- q_of(batch == "b1" & nodes == node) +
+      w * (q_of(batch == "b2" & nodes == node) - q_of(batch == "b1" & nodes == node)) +
+      (1 - w) * glob_off
+    expect_equal(unname(shrunk$quantiles[[g]]), unname(expected), tolerance = 1e-12)
+    expect_identical(shrunk$quantiles[[ga]], raw$quantiles[[ga]])
+  }
+  expect_identical(shrunk$settings$shrink_k, 300)
+})
+
+test_that("shrink_k = 0 leaves every quantile table as fitted", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  model <- fit_quantile_sim(s, shrink_k = 0)
+  probs <- seq(0.025, 0.975, length.out = 21)
+  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
+  x1 <- heb_integrate(model$pass1, ref, s$samples, rep("T", nrow(ref)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$x
+  nodes <- heb_integrate(model$pass2, x1, s$samples, rep("T", nrow(x1)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$nodes
+  batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
+  g <- names(model$quantiles)[[1]]
+  i <- paste(batch, nodes, sep = "\r") == g
+  expect_equal(
+    unname(model$quantiles[[g]][, "M"]),
+    stats::quantile(x1$M[i], probs, names = FALSE, type = 7),
+    tolerance = 1e-12
   )
 })

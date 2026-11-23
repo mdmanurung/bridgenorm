@@ -1,3 +1,11 @@
+# heb 0.7.2
+
+* `heb_fit_node_quantile()` builds quantile tables only for batches whose reference donors (`reference_id`) are
+  exactly the anchor's. Before, every batch got tables, so an unbridged batch that pass 1 left raw was still
+  quantile-mapped onto the anchor's donors, and a partly bridged batch pooled donors the anchor lacks. Such a
+  batch now takes the pass-2 node shift if bridged and stays raw if not, as the README states. Batches in the
+  data set A and data set B benchmarks all share the anchor's donors, so their results are unchanged (decision RV2).
+
 # heb 0.7.1
 
 * `heb_fit_node_quantile()` sorts each column of a shrunk quantile table (rearrangement; Chernozhukov,

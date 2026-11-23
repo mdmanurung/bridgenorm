@@ -241,3 +241,36 @@ test_that("shrink_k = 0 leaves every quantile table as fitted", {
     tolerance = 1e-12
   )
 })
+
+test_that("only batches with exactly the anchor's reference donors get quantile maps (RV2)", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  # b3: unbridged (donor D3 only). b4: partly bridged (D1 shared, D3 not). Cells copied from b2.
+  copy_sample <- function(from, to, batch, ref) {
+    list(
+      x = transform(s$x[s$x$sample_id == from, ], sample_id = to),
+      samples = data.frame(sample_id = to, batch = batch, reference_id = ref)
+    )
+  }
+  extra <- list(
+    copy_sample("D2_b2", "D3_b3", "b3", "D3"),
+    copy_sample("S_b2", "S_b3", "b3", NA),
+    copy_sample("D1_b2", "D1_b4", "b4", "D1"),
+    copy_sample("D2_b2", "D3_b4", "b4", "D3"),
+    copy_sample("S_b2", "S_b4", "b4", NA)
+  )
+  s$x <- rbind(s$x, do.call(rbind, lapply(extra, `[[`, "x")))
+  s$samples <- rbind(s$samples, do.call(rbind, lapply(extra, `[[`, "samples")))
+  model <- fit_quantile_sim(s, unbridged = "abstain", shrink_k = 300)
+  expect_false(any(grepl("^b[34]\r", names(model$quantiles))))
+  expect_true(any(grepl("^b2\r", names(model$quantiles))))
+  res <- integrate_sim(model, s)
+  # Unbridged b3 stays raw, as the README says.
+  s3 <- s$x$sample_id == "S_b3"
+  expect_equal(res$x$M[s3], s$x$M[s3], tolerance = 1e-12)
+  # Partly bridged b4 takes pass 1 then the pass-2 node shift, with no quantile map.
+  r1 <- integrate_sim(model$pass1, s)
+  r2 <- heb_integrate(model$pass2, r1$x, s$samples, rep("T", nrow(s$x)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+  s4 <- s$x$sample_id == "S_b4"
+  expect_equal(res$x$M[s4], r2$x$M[s4], tolerance = 1e-12)
+})

@@ -21,7 +21,9 @@
 #'     on the pass-1 cells. Its node shifts cover the cells pass 2 cannot
 #'     map by quantiles.
 #'   \item For each (batch, pass-2 node) with at least \code{min_cells}
-#'     reference cells pooled over its reference samples, the quantiles at
+#'     reference cells pooled over its reference samples, in a batch whose
+#'     reference donors (\code{reference_id}) are exactly the anchor's, the
+#'     quantiles at
 #'     \code{quantile_probs} of every marker (\code{stats::quantile()},
 #'     type 7) are stored.
 #'   \item Shrinkage: in each such (batch, node) of a non-anchor batch whose
@@ -41,6 +43,11 @@
 #' the difference of the outer quantiles (\code{tail = "shift"}). Other cells
 #' take the pass-2 node shift. Anchor cells are mapped onto their own
 #' quantiles, which leaves values between the outer quantiles unchanged.
+#'
+#' A batch with other reference donors than the anchor has no quantiles:
+#' pooled distributions of different donors differ by biology, not only by
+#' batch. Such a batch takes the pass-2 node shift if it is bridged, and is
+#' left raw if it is not.
 #'
 #' The quantile rule pools wells, while the node shifts count cells per
 #' reference sample; a (batch, node) can therefore have quantiles without a
@@ -182,7 +189,12 @@ heb_fit_node_quantile <- function(
     paste(d$cells$batch[ref_rows], nodes, sep = "\r")
   )
   n_cells <- lengths(groups)
-  groups <- groups[n_cells >= min_cells]
+  # A quantile map matches pooled reference distributions, so only batches whose reference donors are exactly
+  # the anchor's get tables; an unbridged or partly bridged batch keeps the pass-2 shift (heb 0.7.2).
+  ref_cells <- d$cells[ref_rows, ]
+  donors <- lapply(split(ref_cells$reference_id, ref_cells$batch), \(r) sort(unique(r)))
+  same_donors <- names(donors)[vapply(donors, identical, logical(1), donors[[anchor]])]
+  groups <- groups[n_cells >= min_cells & sub("\r.*", "", names(groups)) %in% same_donors]
   q_table <- function(i) {
     q <- apply(
       x1m[i, , drop = FALSE],

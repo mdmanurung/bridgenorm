@@ -112,7 +112,9 @@ Steps, all on reference cells only:
     on the pass-1 cells. Its node shifts cover the cells pass 2 cannot
     map by quantiles.
   \item For each (batch, pass-2 node) with at least \code{min_cells}
-    reference cells pooled over its reference samples, the quantiles at
+    reference cells pooled over its reference samples, in a batch whose
+    reference donors (\code{reference_id}) are exactly the anchor's, the
+    quantiles at
     \code{quantile_probs} of every marker (\code{stats::quantile()},
     type 7) are stored.
   \item Shrinkage: in each such (batch, node) of a non-anchor batch whose
@@ -132,6 +134,11 @@ batch's quantiles to the anchor's; beyond the outer quantiles it moves by
 the difference of the outer quantiles (\code{tail = "shift"}). Other cells
 take the pass-2 node shift. Anchor cells are mapped onto their own
 quantiles, which leaves values between the outer quantiles unchanged.
+
+A batch with other reference donors than the anchor has no quantiles:
+pooled distributions of different donors differ by biology, not only by
+batch. Such a batch takes the pass-2 node shift if it is bridged, and is
+left raw if it is not.
 
 The quantile rule pools wells, while the node shifts count cells per
 reference sample; a (batch, node) can therefore have quantiles without a

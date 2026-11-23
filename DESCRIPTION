@@ -1,6 +1,6 @@
 Package: heb
 Title: Hierarchical Empirical Bayes Batch Correction from Reference Samples
-Version: 0.7.0
+Version: 0.7.1
 Authors@R:
     person("M. D.", "Manurung", email = "m.d.manurung@lumc.nl", role = c("aut", "cre"))
 Description: Estimates technical batch effects in cytometry data from

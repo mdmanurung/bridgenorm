@@ -29,7 +29,9 @@
 #'     quantiles) is pulled toward the batch-wide offset curve (quantiles of
 #'     all the batch's pass-1 reference cells minus the anchor's), with weight
 #'     \eqn{n / (n + shrink_k)} on the node's own curve, \eqn{n} being the
-#'     batch's reference cells in the node. \code{shrink_k = 0} keeps the
+#'     batch's reference cells in the node. Each column of a shrunk table is
+#'     then sorted (rearrangement; Chernozhukov, Fernandez-Val and Galichon
+#'     2010), because the mix can cross itself. \code{shrink_k = 0} keeps the
 #'     fitted tables.
 #' }
 #' At integrate time, pass 1 is applied, then each cell is assigned to its
@@ -206,9 +208,12 @@ heb_fit_node_quantile <- function(
         next
       }
       w <- n_cells[[g]] / (n_cells[[g]] + shrink_k)
-      shrunk[[g]] <- qa +
+      q <- qa +
         w * (quantiles[[g]] - qa) +
         (1 - w) * (batch_q[[b]] - batch_q[[anchor]])
+      # Sort each column (rearrangement): the mix of three monotone curves can cross itself, and a
+      # non-monotone table would swap the order of cells (heb 0.7.1).
+      shrunk[[g]] <- apply(q, 2, sort)
     }
     quantiles <- shrunk
   }

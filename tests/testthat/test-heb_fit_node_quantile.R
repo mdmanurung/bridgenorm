@@ -182,13 +182,10 @@ test_that("every estimate-changing argument is required", {
   )
 })
 
-test_that("shrink_k pulls each node offset curve toward the batch-wide curve by n / (n + shrink_k)", {
-  skip_if_not_installed("kohonen")
-  s <- quantile_sim()
-  raw <- fit_quantile_sim(s, shrink_k = 0)
-  shrunk <- fit_quantile_sim(s, shrink_k = 300)
-  # Expected tables from first principles: pass-1-corrected reference cells, their pass-2 nodes,
-  # stats::quantile() per batch and per (batch, node), then the shrinkage formula.
+# Expected tables from first principles: pass-1-corrected reference cells, their pass-2 nodes,
+# stats::quantile() per batch and per (batch, node), the shrinkage formula, then each column sorted
+# (rearrangement, heb 0.7.1).
+expect_shrunk_tables <- function(s, raw, shrunk, k) {
   probs <- seq(0.025, 0.975, length.out = 21)
   ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
   integ <- function(m, cells) {
@@ -204,14 +201,27 @@ test_that("shrink_k pulls each node offset curve toward the batch-wide curve by 
     ga <- paste("b1", node, sep = "\r")
     skip_if(is.null(raw$quantiles[[g]]) || is.null(raw$quantiles[[ga]]))
     n <- sum(batch == "b2" & nodes == node)
-    w <- n / (n + 300)
+    w <- n / (n + k)
     expected <- q_of(batch == "b1" & nodes == node) +
       w * (q_of(batch == "b2" & nodes == node) - q_of(batch == "b1" & nodes == node)) +
       (1 - w) * glob_off
-    expect_equal(unname(shrunk$quantiles[[g]]), unname(expected), tolerance = 1e-12)
+    expect_equal(unname(shrunk$quantiles[[g]]), unname(apply(expected, 2, sort)), tolerance = 1e-12)
     expect_identical(shrunk$quantiles[[ga]], raw$quantiles[[ga]])
   }
-  expect_identical(shrunk$settings$shrink_k, 300)
+}
+
+test_that("shrink_k pulls each node offset curve toward the batch-wide curve by n / (n + shrink_k), then sorts", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  raw <- fit_quantile_sim(s, shrink_k = 0)
+  # shrink_k 3000 makes some shrunk columns of this fixture non-monotone before sorting (min step -0.017).
+  for (k in c(300, 3000)) {
+    shrunk <- fit_quantile_sim(s, shrink_k = k)
+    expect_shrunk_tables(s, raw, shrunk, k)
+    steps <- unlist(lapply(shrunk$quantiles, function(q) apply(q, 2, function(v) min(diff(v)))))
+    expect_true(all(steps >= 0))
+    expect_identical(shrunk$settings$shrink_k, k)
+  }
 })
 
 test_that("shrink_k = 0 leaves every quantile table as fitted", {

@@ -1,3 +1,11 @@
+# heb 0.7.1
+
+* `heb_fit_node_quantile()` sorts each column of a shrunk quantile table (rearrangement; Chernozhukov,
+  Fernandez-Val and Galichon 2010, Econometrica 78:1093). With `shrink_k = 300` the mix of node, anchor and
+  batch-wide curves left about 0.4% of table columns non-monotone (worst step -0.037 asinh), so a few cells
+  swapped order. The fix changed no benchmark score by more than 0.0007 at SOM seeds 473-475 (tusoskill run
+  heb_round3b_20261122, candidate c016; decision R3b12). `shrink_k = 0` is unchanged.
+
 # heb 0.7.0
 
 * `heb_fit_node_quantile()` gains a required `shrink_k`: each non-anchor (batch, pass-2 node) offset curve

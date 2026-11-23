@@ -120,7 +120,9 @@ Steps, all on reference cells only:
     quantiles) is pulled toward the batch-wide offset curve (quantiles of
     all the batch's pass-1 reference cells minus the anchor's), with weight
     \eqn{n / (n + shrink_k)} on the node's own curve, \eqn{n} being the
-    batch's reference cells in the node. \code{shrink_k = 0} keeps the
+    batch's reference cells in the node. Each column of a shrunk table is
+    then sorted (rearrangement; Chernozhukov, Fernandez-Val and Galichon
+    2010), because the mix can cross itself. \code{shrink_k = 0} keeps the
     fitted tables.
 }
 At integrate time, pass 1 is applied, then each cell is assigned to its

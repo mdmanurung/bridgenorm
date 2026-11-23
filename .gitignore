@@ -9,3 +9,5 @@ experiments/*/figures/
 experiments/*/*.html
 # Session handoff notes
 HANDOFF.md
+docs/
+experiments/logs_tests/

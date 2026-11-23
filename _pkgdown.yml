@@ -1,0 +1,32 @@
+url: ~
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left: [intro, reference, news]
+    right: [search]
+
+reference:
+  - title: Main method
+    desc: Two-pass node correction with per-node quantile maps.
+    contents:
+      - bn_fit_node_quantile
+      - bn_fit_nodes
+  - title: Baselines
+    desc: Paired shift and mixed-model corrections.
+    contents:
+      - bn_fit_paired
+      - bn_fit
+      - bn_fit_shared
+  - title: Apply and store
+    contents:
+      - bn_integrate
+      - bn_save
+  - title: Design checks
+    contents:
+      - bn_bridges
+      - bn_reference_noise
+  - title: Package
+    contents:
+      - bridgenorm-package

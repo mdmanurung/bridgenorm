@@ -1,0 +1,146 @@
+---
+title: "Get started with bridgenorm"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Get started with bridgenorm}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 3.2)
+```
+
+This article corrects a small simulated data set with `bn_fit_node_quantile()`. Because the data are simulated, every cell's value without the batch effect is known, so the correction can be checked against the truth.
+
+```{r library}
+library(bridgenorm)
+```
+
+## Simulated data
+
+Three batches each hold two bridge wells of one reference donor and two study samples. Cells fall in two cell states, A and B, separated on the mapping marker CD3. Marker M carries the batch effect. In batch b2 it is shifted and compressed; in batch b3 it is shifted and stretched; batch b1 is the anchor and has no effect. The batch effect differs between the two cell states, so one shift per batch cannot remove it.
+
+```{r simulate}
+set.seed(1)
+centre <- c(A = 2, B = 1)
+cd3 <- c(A = 1, B = 4)
+effect <- list(
+  b1 = list(shift = c(A = 0, B = 0), scale = 1),
+  b2 = list(shift = c(A = 0.4, B = -0.3), scale = 0.6),
+  b3 = list(shift = c(A = -0.2, B = 0.3), scale = 1.4)
+)
+samples <- data.frame(
+  sample_id = c(outer(c("ref1", "ref2", "s1", "s2"), c("b1", "b2", "b3"), paste, sep = "_")),
+  batch = rep(c("b1", "b2", "b3"), each = 4),
+  reference_id = rep(c("donor", "donor", NA, NA), 3),
+  aliquot = rep(c("ref1", "ref2", NA, NA), 3)
+)
+cells <- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {
+  b <- samples$batch[i]
+  do.call(rbind, lapply(c("A", "B"), function(k) {
+    truth <- rnorm(300, centre[[k]], 0.3)
+    data.frame(
+      sample_id = samples$sample_id[i],
+      state = k,
+      CD3 = rnorm(300, cd3[[k]], 0.2),
+      M = centre[[k]] + effect[[b]]$scale * (truth - centre[[k]]) + effect[[b]]$shift[[k]],
+      truth = truth
+    )
+  }))
+}))
+cells$batch <- samples$batch[match(cells$sample_id, samples$sample_id)]
+head(cells)
+```
+
+`bn_bridges()` checks that every batch shares a bridge donor with the anchor.
+
+```{r bridges}
+bn_bridges(samples, anchor = "b1")
+```
+
+## Fit
+
+The model is fitted on bridge cells only. Every argument that changes an estimate must be given; the values here suit this toy data set and are not recommendations.
+
+```{r fit}
+model <- bn_fit_node_quantile(
+  x = cells[, c("sample_id", "CD3", "M")],
+  samples = samples,
+  population = rep("T", nrow(cells)),
+  markers = c("CD3", "M"),
+  transform = list(name = "asinh", cofactor = 5),
+  anchor = "b1",
+  min_cells = 50,
+  unbridged = "abstain",
+  method = "paired",
+  eb_settings = NULL,
+  grid = c(2, 1),
+  mapping_markers = "CD3",
+  train_cells = 300,
+  rlen = 50,
+  seed = 1,
+  assignment = "nearest",
+  fallback = "global",
+  quantile_probs = seq(0.025, 0.975, length.out = 21),
+  tail = "shift",
+  shrink_k = 300
+)
+model
+```
+
+## Correct
+
+`bn_integrate()` applies the frozen model to all cells, study samples included.
+
+```{r integrate}
+res <- bn_integrate(
+  model,
+  cells[, c("sample_id", "CD3", "M")],
+  samples,
+  rep("T", nrow(cells)),
+  transform = model$transform,
+  unsupported = "abstain"
+)
+head(res$actions)
+```
+
+## Check against the truth
+
+For study cells, the error is the distance between the corrected value of M and its value without the batch effect.
+
+```{r error}
+study <- is.na(samples$reference_id[match(cells$sample_id, samples$sample_id)])
+error <- data.frame(
+  batch = cells$batch[study],
+  uncorrected = abs(cells$M[study] - cells$truth[study]),
+  corrected = abs(res$x$M[study] - cells$truth[study])
+)
+aggregate(cbind(uncorrected, corrected) ~ batch, data = error, FUN = mean)
+```
+
+The densities of M in study cells show the same result. After correction, batch b3 lies on the anchor b1. Batch b2 moves to the anchor's peaks, but its peaks stay narrower than b1's: with `shrink_k = 300`, each node's quantile curve is pulled part of the way toward the batch-wide curve, so the compression in b2 is only partly undone. A smaller `shrink_k` trusts each node's own curve more.
+
+```{r density, echo = FALSE}
+colours <- c(b1 = "black", b2 = "#E69F00", b3 = "#0072B2")
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+for (panel in c("uncorrected", "corrected")) {
+  value <- if (panel == "uncorrected") cells$M else res$x$M
+  plot(NULL, xlim = c(-0.5, 3.5), ylim = c(0, 1.6), xlab = "M", ylab = "Density", main = panel)
+  for (b in names(colours)) {
+    lines(density(value[study & cells$batch == b]), col = colours[[b]], lwd = 1.5)
+  }
+  legend("topright", legend = names(colours), col = colours, lwd = 1.5, bty = "n")
+}
+par(op)
+```
+
+## Save
+
+`bn_save()` stores the model with its digest; `bn_load()` refuses a file whose contents changed after saving.
+
+```{r save}
+path <- tempfile(fileext = ".rds")
+bn_save(model, path)
+identical(bn_load(path), model)
+```

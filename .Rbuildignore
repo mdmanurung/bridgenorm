@@ -3,3 +3,6 @@
 ^plans$
 ^experiments$
 ^HANDOFF\.md$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

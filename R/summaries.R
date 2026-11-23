@@ -5,7 +5,7 @@
 # the replicate unit is the reference aliquot.
 
 # Columns every effects table must have.
-.heb_effect_cols <- c(
+.bn_effect_cols <- c(
   "batch",
   "population",
   "marker",
@@ -18,7 +18,7 @@
   "source"
 )
 
-.heb_empty_effects <- function() {
+.bn_empty_effects <- function() {
   tibble::tibble(
     batch = character(),
     population = character(),
@@ -33,7 +33,7 @@
   )
 }
 
-.heb_empty_excluded <- function() {
+.bn_empty_excluded <- function() {
   tibble::tibble(
     reference_id = character(),
     aliquot = character(),
@@ -46,7 +46,7 @@
 
 # Aliquot summaries in long form, plus the summaries below min_cells.
 # value = mean of the cells; var_mean = var(cells) / n, the known sampling variance.
-.heb_summaries <- function(xm, cells, min_cells) {
+.bn_summaries <- function(xm, cells, min_cells) {
   markers <- colnames(xm)
   ref <- cells[cells$is_reference, , drop = FALSE]
   empty <- tibble::tibble(
@@ -60,7 +60,7 @@
     var_mean = double()
   )
   if (nrow(ref) == 0) {
-    return(list(summ = empty, excluded = .heb_empty_excluded()))
+    return(list(summ = empty, excluded = .bn_empty_excluded()))
   }
   key <- paste(
     ref$reference_id,
@@ -119,7 +119,7 @@
 }
 
 # Donor summaries: equal-weight mean of aliquot summaries per reference and batch.
-.heb_donor_level <- function(summ) {
+.bn_donor_level <- function(summ) {
   key <- paste(
     summ$reference_id,
     summ$batch,
@@ -137,7 +137,7 @@
 }
 
 # Anchor targets: the donor summaries of the anchor batch.
-.heb_targets <- function(donor, anchor) {
+.bn_targets <- function(donor, anchor) {
   anc <- donor[donor$batch == anchor, , drop = FALSE]
   if (nrow(anc) == 0) {
     stop(
@@ -156,7 +156,7 @@
 
 # Paired effects for batches unseen at fit time: mean over shared references of
 # (batch summary - frozen anchor summary), no shrinkage.
-.heb_paired_effects <- function(donor, targets, source) {
+.bn_paired_effects <- function(donor, targets, source) {
   paired <- dplyr::inner_join(
     donor,
     targets,
@@ -164,7 +164,7 @@
     relationship = "many-to-one"
   )
   if (nrow(paired) == 0) {
-    return(.heb_empty_effects())
+    return(.bn_empty_effects())
   }
   diff <- paired$value - paired$target
   key <- paste(paired$batch, paired$population, paired$marker, sep = "\r")

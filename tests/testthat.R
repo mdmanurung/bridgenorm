@@ -1,4 +1,4 @@
 library(testthat)
-library(heb)
+library(bridgenorm)
 
-test_check("heb")
+test_check("bridgenorm")

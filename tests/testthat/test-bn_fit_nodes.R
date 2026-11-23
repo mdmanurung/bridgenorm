@@ -1,4 +1,4 @@
-# heb_fit_nodes(): node-level shifts recover planted per-cluster batch effects; fallback, order, seed, save/load.
+# bn_fit_nodes(): node-level shifts recover planted per-cluster batch effects; fallback, order, seed, save/load.
 
 fit_nodes_sim <- function(s, ...) {
   args <- utils::modifyList(
@@ -12,7 +12,7 @@ fit_nodes_sim <- function(s, ...) {
       min_cells = 20,
       unbridged = "stop",
       method = "paired",
-      heb_settings = NULL,
+      eb_settings = NULL,
       grid = c(2, 1),
       mapping_markers = "CD3",
       train_cells = 200,
@@ -23,11 +23,11 @@ fit_nodes_sim <- function(s, ...) {
     ),
     list(...)
   )
-  do.call(heb_fit_nodes, args)
+  do.call(bn_fit_nodes, args)
 }
 
 integrate_nodes_sim <- function(model, s) {
-  heb_integrate(
+  bn_integrate(
     model,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -58,7 +58,7 @@ test_that("paired node model recovers planted per-cluster shifts", {
 
 test_that("the global CD3+ model cannot recover cluster-specific shifts (control)", {
   s <- nodes_sim()
-  global <- heb_fit_paired(
+  global <- bn_fit_paired(
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
     population = rep("T", nrow(s$x)),
@@ -68,7 +68,7 @@ test_that("the global CD3+ model cannot recover cluster-specific shifts (control
     min_cells = 20,
     unbridged = "stop"
   )
-  res <- heb_integrate(
+  res <- bn_integrate(
     global,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -82,7 +82,7 @@ test_that("the global CD3+ model cannot recover cluster-specific shifts (control
   expect_gt(max(abs(b2$x - ifelse(b2$cluster == "A", 2, 1))), 0.3)
 })
 
-test_that("heb node model recovers planted per-cluster shifts", {
+test_that("eb node model recovers planted per-cluster shifts", {
   skip_if_not_installed("kohonen")
   s <- nodes_sim()
   settings <- list(
@@ -102,7 +102,7 @@ test_that("heb node model recovers planted per-cluster shifts", {
     batch_shrinkage_tau2 = "profile"
   )
   res <- integrate_nodes_sim(
-    fit_nodes_sim(s, method = "heb", heb_settings = settings),
+    fit_nodes_sim(s, method = "eb", eb_settings = settings),
     s
   )
   m <- study_means(res, s)
@@ -171,7 +171,7 @@ test_that("one seed gives the same map; the seed is required", {
     min_cells = 20,
     unbridged = "stop",
     method = "paired",
-    heb_settings = NULL,
+    eb_settings = NULL,
     grid = c(2, 1),
     mapping_markers = "CD3",
     train_cells = 200,
@@ -179,23 +179,23 @@ test_that("one seed gives the same map; the seed is required", {
     assignment = "nearest",
     fallback = "global"
   )
-  expect_error(do.call(heb_fit_nodes, args), "seed")
+  expect_error(do.call(bn_fit_nodes, args), "seed")
 })
 
-test_that("a node model survives heb_save and heb_load", {
+test_that("a node model survives bn_save and bn_load", {
   skip_if_not_installed("kohonen")
   s <- nodes_sim()
   model <- fit_nodes_sim(s)
   path <- tempfile(fileext = ".rds")
-  heb_save(model, path)
-  loaded <- heb_load(path)
+  bn_save(model, path)
+  loaded <- bn_load(path)
   expect_equal(
     integrate_nodes_sim(loaded, s)$x,
     integrate_nodes_sim(model, s)$x
   )
   tampered <- model
   tampered$map$nodes[1, 1] <- tampered$map$nodes[1, 1] + 1
-  expect_error(heb_save(tampered, path), "Digest mismatch")
+  expect_error(bn_save(tampered, path), "Digest mismatch")
 })
 
 # Review fixes for 0.5.1 (plans/2026-11-21_heb-0.5.1-fixes.md) -----------------
@@ -232,7 +232,7 @@ test_that("a node row reads 'apply' only when every cell in it got the global ef
   batch <- batch[keep]
   # min_cells 25: each b3 node has 20 cells per sample (15 P + 5 Q), so no node effect; global P has 30.
   model <- fit_nodes_sim(s, population = pop, min_cells = 25)
-  res <- heb_integrate(
+  res <- bn_integrate(
     model,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -253,7 +253,7 @@ test_that("a node row reads 'apply' only when every cell in it got the global ef
   )
   expect_equal(sum(raw[batch == "b3" & pop == "P"]), 0)
   expect_error(
-    heb_integrate(
+    bn_integrate(
       model,
       s$x[, c("sample_id", "CD3", "M")],
       s$samples,
@@ -289,7 +289,7 @@ test_that("a node model keeps the effects of a batch it estimated at integrate t
   )
 })
 
-test_that("heb_fit_nodes() leaves the caller's random number stream alone", {
+test_that("bn_fit_nodes() leaves the caller's random number stream alone", {
   skip_if_not_installed("kohonen")
   s <- nodes_sim()
   set.seed(1)

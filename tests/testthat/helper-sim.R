@@ -1,7 +1,7 @@
 # Simulations shared by the tests (ported from SpectraWeaveR test-corrector_heb*.R).
 
 # Reference-only simulation: 3 donors measured in 6 batches (3 studies x 2 runs).
-heb_sim <- function(seed = 5) {
+bn_sim <- function(seed = 5) {
   set.seed(seed)
   batches <- paste0("s", rep(1:3, each = 2), "_r", rep(1:2, 3))
   study_eff <- c(s1 = 0, s2 = 0.6, s3 = -0.4)
@@ -42,7 +42,7 @@ heb_sim <- function(seed = 5) {
   )
 }
 
-# heb_fit() on heb_sim() with plain settings; any setting can be overridden.
+# bn_fit() on bn_sim() with plain settings; any setting can be overridden.
 fit_sim <- function(s, x = s$x, meta = s$meta, ...) {
   args <- utils::modifyList(
     list(
@@ -71,7 +71,7 @@ fit_sim <- function(s, x = s$x, meta = s$meta, ...) {
     ),
     list(...)
   )
-  do.call(heb_fit, args)
+  do.call(bn_fit, args)
 }
 
 # Keep only the samples where `keep` is TRUE.
@@ -150,7 +150,7 @@ hebs_sim <- function(
 }
 
 fit_shared_sim <- function(s) {
-  heb_fit_shared(
+  bn_fit_shared(
     s$x,
     s$meta,
     population = s$pop,

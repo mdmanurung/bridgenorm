@@ -1,8 +1,8 @@
-# Apply a frozen model: heb_integrate().
+# Apply a frozen model: bn_integrate().
 #
 # Ported from SpectraWeaveR R/corrector.R (sw_corrector_integrate, .sw_apply_effects).
 
-#' Apply a frozen HEB model to new or old data
+#' Apply a frozen bridgenorm model to new or old data
 #'
 #' Corrects \code{x} with the frozen effects and reports one action per
 #' (batch, population, marker). Earlier effects never change, so values
@@ -23,8 +23,8 @@
 #' }
 #' Abstain keeps the original value exactly.
 #'
-#' @param model A \code{heb_model}.
-#' @param x Data in the same form as for \code{\link{heb_fit}}.
+#' @param model A \code{bn_model}.
+#' @param x Data in the same form as for \code{\link{bn_fit}}.
 #' @param samples Sample table covering every sample in \code{x}.
 #' @param population Per-cell population labels for \code{x}.
 #' @param transform The scale \code{x} is on. It must equal the model's.
@@ -35,16 +35,16 @@
 #' @param sample_ids Optional sample id per row; required for a matrix
 #'   \code{x}.
 #'
-#' @return A \code{heb_result}: a list with \code{x} (corrected data, same
+#' @return A \code{bn_result}: a list with \code{x} (corrected data, same
 #'   shape, row order and columns as the input), \code{actions} (one row per
 #'   batch, population and marker: \code{action}, \code{reason_code},
 #'   \code{reason}, estimate and support columns, \code{n_cells}),
 #'   \code{model} (the input model, or a copy extended with new-batch
 #'   effects, with a new digest and \code{parent_digest}), \code{excluded}
 #'   and \code{aliquot_source}.
-#' @seealso \code{\link{heb_fit}}
+#' @seealso \code{\link{bn_fit}}
 #' @export
-heb_integrate <- function(
+bn_integrate <- function(
   model,
   x,
   samples,
@@ -53,7 +53,7 @@ heb_integrate <- function(
   unsupported,
   sample_ids = NULL
 ) {
-  .heb_stop_missing(c(
+  .bn_stop_missing(c(
     model = missing(model),
     x = missing(x),
     samples = missing(samples),
@@ -61,15 +61,15 @@ heb_integrate <- function(
     transform = missing(transform),
     unsupported = missing(unsupported)
   ))
-  .heb_check_choice(
+  .bn_check_choice(
     unsupported,
     "unsupported",
     c("abstain", "error"),
-    what = "heb_integrate"
+    what = "bn_integrate"
   )
-  # A two-pass quantile model (heb_fit_node_quantile) applies its node passes and quantile maps.
-  if (inherits(model, "heb_node_quantile_model")) {
-    return(.heb_integrate_node_quantile(
+  # A two-pass quantile model (bn_fit_node_quantile) applies its node passes and quantile maps.
+  if (inherits(model, "bn_node_quantile_model")) {
+    return(.bn_integrate_node_quantile(
       model,
       x,
       samples,
@@ -79,9 +79,9 @@ heb_integrate <- function(
       sample_ids
     ))
   }
-  # A node-level model (heb_fit_nodes) assigns cells to nodes, then applies its component models.
-  if (inherits(model, "heb_node_model")) {
-    return(.heb_integrate_nodes(
+  # A node-level model (bn_fit_nodes) assigns cells to nodes, then applies its component models.
+  if (inherits(model, "bn_node_model")) {
+    return(.bn_integrate_nodes(
       model,
       x,
       samples,
@@ -91,14 +91,14 @@ heb_integrate <- function(
       sample_ids
     ))
   }
-  .heb_validate(model)
-  transform <- .heb_check_transform(transform)
+  .bn_validate(model)
+  transform <- .bn_check_transform(transform)
   if (!identical(transform, model$transform)) {
     stop(
       "Transform mismatch: the model was fitted on ",
-      .heb_transform_label(model$transform),
+      .bn_transform_label(model$transform),
       " but 'x' is declared as ",
-      .heb_transform_label(transform),
+      .bn_transform_label(transform),
       ".",
       call. = FALSE
     )
@@ -112,26 +112,26 @@ heb_integrate <- function(
       call. = FALSE
     )
   }
-  d <- .heb_cells(x, samples, population, model$markers, sample_ids)
+  d <- .bn_cells(x, samples, population, model$markers, sample_ids)
 
   # Only batches the model has never seen may get new effects.
   new_batches <- setdiff(sort(unique(d$cells$batch)), model$known_batches)
-  new_eff <- .heb_empty_effects()
-  new_exc <- .heb_empty_excluded()
+  new_eff <- .bn_empty_effects()
+  new_exc <- .bn_empty_excluded()
   if (length(new_batches) > 0) {
     bridging <- d$cells$batch %in%
       new_batches &
       d$cells$is_reference &
       d$cells$reference_id %in% model$targets$reference_id
-    s <- .heb_summaries(
+    s <- .bn_summaries(
       d$xm,
       d$cells[bridging, , drop = FALSE],
       model$min_cells
     )
     new_exc <- s$excluded
     if (nrow(s$summ) > 0) {
-      new_eff <- .heb_paired_effects(
-        .heb_donor_level(s$summ),
+      new_eff <- .bn_paired_effects(
+        .bn_donor_level(s$summ),
         model$targets,
         "integrate"
       )
@@ -157,10 +157,10 @@ heb_integrate <- function(
       new_exc[new_exc$batch %in% added, , drop = FALSE]
     )
     updated$parent_digest <- model$digest
-    updated$digest <- .heb_digest(updated)
+    updated$digest <- .bn_digest(updated)
   }
 
-  applied <- .heb_apply_effects(
+  applied <- .bn_apply_effects(
     updated,
     d$xm,
     d$cells,
@@ -184,18 +184,18 @@ heb_integrate <- function(
 
   structure(
     list(
-      x = .heb_restore(x, applied$xm, model$markers),
+      x = .bn_restore(x, applied$xm, model$markers),
       actions = applied$actions,
       model = updated,
       excluded = new_exc,
       aliquot_source = d$aliquot_source
     ),
-    class = "heb_result"
+    class = "bn_result"
   )
 }
 
 # Write corrected marker columns back into the input's shape.
-.heb_restore <- function(x, xm, markers) {
+.bn_restore <- function(x, xm, markers) {
   out <- x
   if (is.matrix(x)) {
     out[, markers] <- xm
@@ -208,7 +208,7 @@ heb_integrate <- function(
 }
 
 # Subtract each (batch, population, marker) effect; abstain where none exists.
-.heb_apply_effects <- function(model, xm, cells, new_batches, estimated_now) {
+.bn_apply_effects <- function(model, xm, cells, new_batches, estimated_now) {
   markers <- model$markers
   groups <- unique(cells[, c("batch", "population")])
   groups <- groups[order(groups$batch, groups$population), , drop = FALSE]
@@ -228,7 +228,7 @@ heb_integrate <- function(
   )
   # Optional scale columns (scale_model = "log_sd") travel with the effect.
   scale_cols <- intersect(c("scale", "scale_centre"), names(model$effects))
-  eff <- model$effects[, c(.heb_effect_cols, scale_cols)]
+  eff <- model$effects[, c(.bn_effect_cols, scale_cols)]
   actions <- dplyr::left_join(
     actions,
     eff,
@@ -314,10 +314,10 @@ heb_integrate <- function(
 }
 
 #' @export
-print.heb_result <- function(x, ...) {
+print.bn_result <- function(x, ...) {
   n <- table(factor(x$actions$action, levels = c("apply", "abstain")))
   cat(
-    "<heb_result>",
+    "<bn_result>",
     n[["apply"]],
     "applied,",
     n[["abstain"]],

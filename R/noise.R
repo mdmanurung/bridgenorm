@@ -21,13 +21,13 @@
 #'     batches; \code{NA} when none has.}
 #' }
 #' A donor mean is the equal-weight mean of its aliquot means, as in
-#' \code{\link{heb_fit}}.
+#' \code{\link{bn_fit}}.
 #'
-#' @inheritParams heb_fit
+#' @inheritParams bn_fit
 #' @return A tibble with one row per batch, population and marker.
-#' @seealso \code{\link{heb_fit}}, \code{\link{heb_bridges}}
+#' @seealso \code{\link{bn_fit}}, \code{\link{bn_bridges}}
 #' @export
-heb_reference_noise <- function(
+bn_reference_noise <- function(
   x,
   samples,
   population,
@@ -36,7 +36,7 @@ heb_reference_noise <- function(
   min_cells,
   sample_ids = NULL
 ) {
-  .heb_stop_missing(c(
+  .bn_stop_missing(c(
     x = missing(x),
     samples = missing(samples),
     population = missing(population),
@@ -44,10 +44,10 @@ heb_reference_noise <- function(
     transform = missing(transform),
     min_cells = missing(min_cells)
   ))
-  .heb_check_transform(transform)
-  .heb_check_min_cells(min_cells)
-  d <- .heb_cells(x, samples, population, markers, sample_ids)
-  s <- .heb_summaries(d$xm, d$cells, as.integer(min_cells))$summ
+  .bn_check_transform(transform)
+  .bn_check_min_cells(min_cells)
+  d <- .bn_cells(x, samples, population, markers, sample_ids)
+  s <- .bn_summaries(d$xm, d$cells, as.integer(min_cells))$summ
   if (nrow(s) == 0) {
     stop("No reference summary has at least min_cells cells.", call. = FALSE)
   }
@@ -74,7 +74,7 @@ heb_reference_noise <- function(
     )
 
   # Donor level: leave-one-batch-out z per donor, then the mean over donors.
-  donor <- .heb_donor_level(s)
+  donor <- .bn_donor_level(s)
   loo <- donor |>
     dplyr::mutate(
       z = vapply(

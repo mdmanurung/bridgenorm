@@ -1,9 +1,9 @@
-# heb_integrate(), the frozen model and save/load.
+# bn_integrate(), the frozen model and save/load.
 
 test_that("integrating again leaves earlier corrected values unchanged", {
-  s <- heb_sim()
+  s <- bn_sim()
   model <- fit_sim(s)
-  old <- heb_integrate(
+  old <- bn_integrate(
     model,
     s$x,
     s$meta,
@@ -11,7 +11,7 @@ test_that("integrating again leaves earlier corrected values unchanged", {
     TF,
     unsupported = "abstain"
   )
-  again <- heb_integrate(
+  again <- bn_integrate(
     old$model,
     s$x,
     s$meta,
@@ -22,8 +22,8 @@ test_that("integrating again leaves earlier corrected values unchanged", {
   expect_identical(old$x, again$x)
   s2 <- hebs_sim()
   m2 <- fit_shared_sim(s2)
-  o2 <- heb_integrate(m2, s2$x, s2$meta, s2$pop, TF, unsupported = "abstain")
-  a2 <- heb_integrate(
+  o2 <- bn_integrate(m2, s2$x, s2$meta, s2$pop, TF, unsupported = "abstain")
+  a2 <- bn_integrate(
     o2$model,
     s2$x,
     s2$meta,
@@ -35,11 +35,11 @@ test_that("integrating again leaves earlier corrected values unchanged", {
 })
 
 test_that("a new bridged batch gets a paired effect and old effects stay frozen", {
-  s <- heb_sim()
+  s <- bn_sim()
   in_new <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)] == "s3_r2"
   s_old <- subset_sim(s, s$meta$batch != "s3_r2")
   model <- fit_sim(s_old, hierarchy = s$hierarchy)
-  res <- heb_integrate(
+  res <- bn_integrate(
     model,
     s$x,
     s$meta,
@@ -77,10 +77,10 @@ test_that("a new bridged batch gets a paired effect and old effects stay frozen"
 })
 
 test_that("integrate refuses a different transform and reports abstentions under 'error'", {
-  s <- heb_sim()
+  s <- bn_sim()
   model <- fit_sim(s)
   expect_error(
-    heb_integrate(
+    bn_integrate(
       model,
       s$x,
       s$meta,
@@ -91,7 +91,7 @@ test_that("integrate refuses a different transform and reports abstentions under
     "Transform mismatch"
   )
   expect_error(
-    heb_integrate(
+    bn_integrate(
       model,
       s$x,
       s$meta,
@@ -104,23 +104,23 @@ test_that("integrate refuses a different transform and reports abstentions under
 })
 
 test_that("save and load keep the digest; a changed model fails validation", {
-  s <- heb_sim()
+  s <- bn_sim()
   model <- fit_sim(s)
   path <- tempfile(fileext = ".rds")
-  heb_save(model, path)
-  expect_identical(heb_load(path)$digest, model$digest)
+  bn_save(model, path)
+  expect_identical(bn_load(path)$digest, model$digest)
   bad <- model
   bad$effects$estimate[2] <- bad$effects$estimate[2] + 1
-  expect_error(heb_save(bad, path), "Digest mismatch")
+  expect_error(bn_save(bad, path), "Digest mismatch")
 })
 
-test_that("heb_bridges lists batches without a reference shared with the anchor", {
+test_that("bn_bridges lists batches without a reference shared with the anchor", {
   samples <- data.frame(
     sample_id = paste0("s", 1:5),
     batch = c("b1", "b1", "b2", "b3", "b3"),
     reference_id = c("R1", "R2", "R2", "R3", NA)
   )
-  br <- heb_bridges(samples, anchor = "b1")
+  br <- bn_bridges(samples, anchor = "b1")
   expect_equal(br$batch, c("b2", "b3"))
   expect_equal(br$bridged, c(TRUE, FALSE))
   expect_equal(br$shared_ids, c("R2", ""))

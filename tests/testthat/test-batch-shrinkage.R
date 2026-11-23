@@ -8,10 +8,10 @@ eb_given <- function(y, s2, tau2, mu) {
   list(standard = mu + w * (y - mu), adaptive = mu + a * (y - mu))
 }
 
-test_that(".heb_moderate with a given tau2 applies the formula", {
+test_that(".bn_moderate with a given tau2 applies the formula", {
   y <- c(0.1, 0.5, -0.2)
   s2 <- c(0.01, 0.02, 0.04)
-  r <- heb:::.heb_moderate(y, s2, "adaptive", "zero", tau2 = 0.05)
+  r <- bridgenorm:::.bn_moderate(y, s2, "adaptive", "zero", tau2 = 0.05)
   expect_equal(r$estimate, eb_given(y, s2, 0.05, 0)$adaptive)
   expect_equal(r$tau2, 0.05)
 })
@@ -28,13 +28,13 @@ test_that("well variance: pooled excess of replicate variance over cell variance
     var_mean = 0.001
   )
   # Replicate SS: b1 0.08 (df 2), b2 0.08 (df 1): pooled 0.16 / 3; minus mean cell var 0.001.
-  got <- heb:::.heb_well_variance(summ)
+  got <- bridgenorm:::.bn_well_variance(summ)
   expect_equal(got$well_var, 0.16 / 3 - 0.001)
 })
 
 # One donor (D1), 2 aliquots per batch, one marker; batch s3_r1 gets a large true extra shift.
 one_donor_sim <- function(extra = 1.5) {
-  s <- heb_sim()
+  s <- bn_sim()
   s <- subset_sim(s, s$meta$donor == "D1")
   b <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)]
   s$x$m1 <- s$x$m1 + ifelse(b == "s3_r1", extra, 0)
@@ -87,7 +87,7 @@ test_that("adaptive shrinkage across batches equals the hand computation on pair
   well <- max(rep_ss / (nrow(meta) - length(dm)) - mean(meta$vm), 0)
   nb <- names(y) != "s1_r1"
   s2 <- cell[nb] + cell[["s1_r1"]] + well * (1 / 2 + 1 / 2)
-  want <- heb:::.heb_moderate(
+  want <- bridgenorm:::.bn_moderate(
     unname(y[nb]),
     unname(s2),
     "adaptive",
@@ -145,7 +145,7 @@ test_that("a study with one non-anchor batch is labelled, not silently left unsh
 
 test_that("REML tau2 equals the lme4 batch variance", {
   skip_if_not_installed("lme4")
-  s <- heb_sim()
+  s <- bn_sim()
   eff <- fit_sim(
     s,
     batch_shrinkage = "standard_eb",
@@ -174,7 +174,7 @@ test_that("REML tau2 equals the lme4 batch variance", {
 
 test_that("shrinkage variances use donors and unequal aliquot counts as written by hand", {
   # Two donors; batch s2_r1 keeps one aliquot per donor, every other batch two.
-  s <- heb_sim()
+  s <- bn_sim()
   s <- subset_sim(
     s,
     s$meta$donor %in%

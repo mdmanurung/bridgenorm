@@ -5,7 +5,7 @@
 # reference when its reference_id is not NA.
 
 # Stop naming every required argument the caller left out.
-.heb_stop_missing <- function(flags) {
+.bn_stop_missing <- function(flags) {
   absent <- names(flags)[flags]
   if (length(absent) > 0) {
     stop(
@@ -19,7 +19,7 @@
 }
 
 # One string out of a fixed set, or stop with the allowed values.
-.heb_check_choice <- function(value, name, choices, what = "heb") {
+.bn_check_choice <- function(value, name, choices, what = "bridgenorm") {
   if (!is.character(value) || length(value) != 1 || !value %in% choices) {
     stop(
       sprintf(
@@ -35,7 +35,7 @@
 }
 
 # Normalise and check list(name = "asinh", cofactor = <number>).
-.heb_check_transform <- function(transform) {
+.bn_check_transform <- function(transform) {
   if (
     !is.list(transform) ||
       !is.character(transform[["name"]]) ||
@@ -65,7 +65,7 @@
 }
 
 # Short text for a transform, used in messages.
-.heb_transform_label <- function(transform) {
+.bn_transform_label <- function(transform) {
   if (is.null(transform[["cofactor"]])) {
     transform[["name"]]
   } else {
@@ -78,7 +78,7 @@
 }
 
 # Check the sample table: one row per sample, the columns the model reads.
-.heb_check_samples <- function(samples) {
+.bn_check_samples <- function(samples) {
   need <- c("sample_id", "batch", "reference_id")
   if (!is.data.frame(samples) || !all(need %in% names(samples))) {
     stop(
@@ -101,7 +101,7 @@
 }
 
 # Marker matrix and per-cell table from x, the sample table and the labels.
-.heb_cells <- function(x, samples, population, markers, sample_ids) {
+.bn_cells <- function(x, samples, population, markers, sample_ids) {
   if (is.matrix(x)) {
     if (!is.numeric(x)) {
       stop("A matrix 'x' must be numeric.", call. = FALSE)
@@ -160,7 +160,7 @@
     )
   }
 
-  samples <- .heb_check_samples(samples)
+  samples <- .bn_check_samples(samples)
   uncovered <- setdiff(unique(ids), as.character(samples$sample_id))
   if (length(uncovered) > 0) {
     stop(
@@ -210,7 +210,7 @@
 #' A batch is bridged when at least one of its reference samples has a
 #' \code{reference_id} that is also measured in the anchor batch. Connection
 #' through other batches does not count. This is the rule
-#' \code{\link{heb_fit}} uses for \code{unbridged}.
+#' \code{\link{bn_fit}} uses for \code{unbridged}.
 #'
 #' @param samples Data frame with columns \code{sample_id}, \code{batch} and
 #'   \code{reference_id} (\code{NA} for samples that are not references).
@@ -224,12 +224,12 @@
 #'   sample_id = paste0("s", 1:4), batch = c("b1", "b2", "b3", "b3"),
 #'   reference_id = c("R1", "R1", "R2", NA)
 #' )
-#' heb_bridges(samples, anchor = "b1")
+#' bn_bridges(samples, anchor = "b1")
 #'
 #' @export
-heb_bridges <- function(samples, anchor) {
-  .heb_stop_missing(c(samples = missing(samples), anchor = missing(anchor)))
-  samples <- .heb_check_samples(samples)
+bn_bridges <- function(samples, anchor) {
+  .bn_stop_missing(c(samples = missing(samples), anchor = missing(anchor)))
+  samples <- .bn_check_samples(samples)
   batch <- as.character(samples$batch)
   ref <- as.character(samples$reference_id)
   if (!anchor %in% batch) {
@@ -238,11 +238,11 @@ heb_bridges <- function(samples, anchor) {
       call. = FALSE
     )
   }
-  .heb_bridge_table(batch, ref, anchor)
+  .bn_bridge_table(batch, ref, anchor)
 }
 
 # Bridge table from per-row batch and reference ids (NA = not a reference).
-.heb_bridge_table <- function(batch, ref, anchor) {
+.bn_bridge_table <- function(batch, ref, anchor) {
   anchor_ids <- unique(ref[batch == anchor & !is.na(ref)])
   others <- sort(setdiff(unique(batch), anchor))
   shared <- lapply(others, function(b) {

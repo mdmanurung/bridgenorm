@@ -1,8 +1,8 @@
-# heb_reference_noise() (roadmap R7): report-only noise per batch, against hand computations.
+# bn_reference_noise() (roadmap R7): report-only noise per batch, against hand computations.
 
 noise_sim <- function(s, meta = s$meta) {
   x <- s$x[s$x$sample_id %in% meta$sample_id, ]
-  heb_reference_noise(
+  bn_reference_noise(
     x,
     meta,
     population = rep("T", nrow(x)),
@@ -13,7 +13,7 @@ noise_sim <- function(s, meta = s$meta) {
 }
 
 test_that("noise columns equal hand computations", {
-  s <- heb_sim()
+  s <- bn_sim()
   got <- noise_sim(s)
   meta <- s$meta
   meta$am <- tapply(s$x$m1, s$x$sample_id, mean)[meta$sample_id]
@@ -37,7 +37,7 @@ test_that("noise columns equal hand computations", {
 })
 
 test_that("one aliquot per batch gives no replicate SD", {
-  s <- heb_sim()
+  s <- bn_sim()
   meta <- s$meta[s$meta$donor == "D1" & endsWith(s$meta$sample_id, "_1"), ]
   got <- noise_sim(s, meta)
   expect_true(all(is.na(got$replicate_sd)))

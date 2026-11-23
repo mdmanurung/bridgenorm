@@ -1,9 +1,9 @@
-# heb_fit(): required settings, lme4 oracle, limiting cases, scale term, unbridged batches.
+# bn_fit(): required settings, lme4 oracle, limiting cases, scale term, unbridged batches.
 
-test_that("heb_fit names every missing required argument", {
-  s <- heb_sim()
+test_that("bn_fit names every missing required argument", {
+  s <- bn_sim()
   expect_error(
-    heb_fit(s$x, s$meta, population = rep("T", nrow(s$x)), markers = "m1"),
+    bn_fit(s$x, s$meta, population = rep("T", nrow(s$x)), markers = "m1"),
     "transform.*anchor.*hierarchy.*min_cells.*unbridged.*variance_floor.*pool"
   )
   expect_error(fit_sim(s, hierarchy = NULL), "hierarchy")
@@ -18,7 +18,7 @@ test_that("heb_fit names every missing required argument", {
 })
 
 test_that("pooling over populations changes nothing with one population and marker", {
-  s <- heb_sim()
+  s <- bn_sim()
   expect_equal(
     fit_sim(s, pool = "population")$effects$estimate,
     fit_sim(s)$effects$estimate,
@@ -26,9 +26,9 @@ test_that("pooling over populations changes nothing with one population and mark
   )
 })
 
-test_that("heb effects match an lme4 REML fit on the same summaries", {
+test_that("bn_fit effects match an lme4 REML fit on the same summaries", {
   skip_if_not_installed("lme4")
-  s <- heb_sim()
+  s <- bn_sim()
   eff <- fit_sim(s)$effects
   d <- s$meta
   d$value <- vapply(
@@ -58,13 +58,13 @@ test_that("heb effects match an lme4 REML fit on the same summaries", {
 })
 
 test_that("the boundary prior keeps one-donor SEs off zero", {
-  s1 <- subset_sim(heb_sim(), heb_sim()$meta$donor == "D1")
+  s1 <- subset_sim(bn_sim(), bn_sim()$meta$donor == "D1")
   eff <- fit_sim(s1, variance_prior = "boundary_avoiding")$effects
   expect_true(all(eff$se_donor[eff$batch != "s1_r1"] > 1e-3))
 })
 
 test_that("known sampling variance sets the one-donor, one-aliquot SE", {
-  s <- heb_sim()
+  s <- bn_sim()
   s <- subset_sim(s, s$meta$donor == "D1" & endsWith(s$meta$sample_id, "_1"))
   eff <- fit_sim(s, residual_model = "known_plus_extra")$effects
   se <- eff$se_donor[eff$batch != "s1_r1"]
@@ -72,8 +72,8 @@ test_that("known sampling variance sets the one-donor, one-aliquot SE", {
   expect_true(all(is.finite(eff$estimate)))
 })
 
-test_that("heb fits a design with one reference donor", {
-  s1 <- subset_sim(heb_sim(), heb_sim()$meta$donor == "D1")
+test_that("bn_fit fits a design with one reference donor", {
+  s1 <- subset_sim(bn_sim(), bn_sim()$meta$donor == "D1")
   eff <- fit_sim(s1)$effects
   expect_equal(nrow(eff), 6)
   expect_true(all(is.finite(eff$estimate)))
@@ -81,7 +81,7 @@ test_that("heb fits a design with one reference donor", {
 
 test_that("Satterthwaite df reduces to the residual df without shrinkage", {
   # Batch variances far above the noise: df = 2 / Var(log sigma^2) = df_resid = 6 - 3 - 1 = 2.
-  d <- .heb_design(
+  d <- .bn_design(
     data.frame(
       value = c(1, 2.1, 3, 2, 3, 4.2),
       reference_id = rep(c("D1", "D2", "D3"), 2),
@@ -93,20 +93,20 @@ test_that("Satterthwaite df reduces to the residual df without shrinkage", {
     "random",
     "estimated"
   )
-  est <- .heb_blup(d, c(1, 1, 1e-8), "a", cov_log = diag(c(0, 0, 2 / 2)))
+  est <- .bn_blup(d, c(1, 1, 1e-8), "a", cov_log = diag(c(0, 0, 2 / 2)))
   expect_equal(est$df[est$batch == "b"], 2, tolerance = 1e-3)
   expect_true(is.na(est$df[est$batch == "a"]))
-  eff <- fit_sim(heb_sim())$effects
+  eff <- fit_sim(bn_sim())$effects
   expect_true(all(eff$df[eff$batch != "s1_r1"] > 0))
   expect_true(all(is.na(eff$df[eff$batch == "s1_r1"])))
 })
 
 test_that("anchor_effect = 'fixed' pins the anchor at zero and reduces to paired shift", {
-  s <- heb_sim()
+  s <- bn_sim()
   fixed <- fit_sim(s, anchor_effect = "fixed")$effects
   expect_equal(fixed$estimate[fixed$batch == "s1_r1"], 0)
   expect_equal(fixed$se_donor[fixed$batch == "s1_r1"], 0)
-  d <- .heb_design(
+  d <- .bn_design(
     data.frame(
       value = c(1, 2, 3, 2, 3, 4),
       reference_id = rep(c("D1", "D2", "D3"), 2),
@@ -119,14 +119,14 @@ test_that("anchor_effect = 'fixed' pins the anchor at zero and reduces to paired
     "estimated"
   )
   expect_equal(
-    .heb_blup(d, c(1e3, 1e3, 1e-3), "a")$estimate,
+    .bn_blup(d, c(1e3, 1e3, 1e-3), "a")$estimate,
     c(0, 1),
     tolerance = 1e-3
   )
 })
 
 test_that("unbridged = 'stop' refuses and 'abstain' leaves the unbridged batch raw", {
-  s <- heb_sim()
+  s <- bn_sim()
   # Batch s3_r2 keeps its cells, but its samples are not references.
   meta2 <- s$meta
   no_ref <- meta2$batch == "s3_r2"
@@ -141,7 +141,7 @@ test_that("unbridged = 'stop' refuses and 'abstain' leaves the unbridged batch r
     residual_model = "known_plus_extra"
   )
   expect_setequal(model$effects$batch, setdiff(s$hierarchy$batch, "s3_r2"))
-  out <- heb_integrate(
+  out <- bn_integrate(
     model,
     s$x,
     meta2,
@@ -158,7 +158,7 @@ test_that("unbridged = 'stop' refuses and 'abstain' leaves the unbridged batch r
 })
 
 test_that("a batch whose references are not in the anchor batch gets no effect under abstain", {
-  s <- heb_sim()
+  s <- bn_sim()
   meta2 <- s$meta
   # s3_r2 keeps references, but under ids the anchor batch never measured.
   meta2$reference_id[meta2$batch == "s3_r2"] <- paste0(
@@ -172,7 +172,7 @@ test_that("a batch whose references are not in the anchor batch gets no effect u
 
 # Scale term on log SD (plan F12) -----------------------------------------------------------------
 scale_sim <- function(spread) {
-  s <- heb_sim()
+  s <- bn_sim()
   mu <- s$meta$mu[match(s$x$sample_id, s$meta$sample_id)]
   b <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)]
   f <- ifelse(b == "s2_r1", spread, 1)
@@ -200,7 +200,7 @@ test_that("log_sd scale is about 1 without a spread effect and recovers a 1.5x s
 test_that("log_sd correction evens the spread, and scale_model = 'none' is the plain shift", {
   s <- scale_sim(1.5)
   fit <- fit_sim(s, residual_model = "known_plus_extra", scale_model = "log_sd")
-  out <- heb_integrate(
+  out <- bn_integrate(
     fit,
     s$x,
     s$meta,
@@ -222,7 +222,7 @@ test_that("log_sd correction evens the spread, and scale_model = 'none' is the p
 # Review fixes for 0.5.1 (plans/2026-11-21_heb-0.5.1-fixes.md) -----------------
 
 test_that("n_aliquots counts aliquots per donor, not shared labels", {
-  s <- heb_sim()
+  s <- bn_sim()
   # Label aliquots "1" and "2" within each donor and batch: 3 donors x 2 = 6 aliquots per batch.
   s$meta$aliquot <- sub(".*_", "", s$meta$sample_id)
   eff <- fit_sim(s)$effects
@@ -231,7 +231,7 @@ test_that("n_aliquots counts aliquots per donor, not shared labels", {
 })
 
 test_that("a missing study label stops with a clear message", {
-  s <- heb_sim()
+  s <- bn_sim()
   s$hierarchy$study[2] <- NA
   expect_error(fit_sim(s), "study")
 })

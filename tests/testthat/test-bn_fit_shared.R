@@ -1,9 +1,9 @@
-# heb_fit_shared(): lme4 oracle, borrowing, abstention and invariance.
+# bn_fit_shared(): lme4 oracle, borrowing, abstention and invariance.
 
-test_that("heb_fit_shared needs hierarchy and variance_floor", {
+test_that("bn_fit_shared needs hierarchy and variance_floor", {
   s <- hebs_sim()
   expect_error(
-    heb_fit_shared(
+    bn_fit_shared(
       s$x,
       s$meta,
       population = s$pop,
@@ -17,7 +17,7 @@ test_that("heb_fit_shared needs hierarchy and variance_floor", {
     "hierarchy"
   )
   expect_error(
-    heb_fit_shared(
+    bn_fit_shared(
       s$x,
       s$meta,
       population = s$pop,
@@ -31,7 +31,7 @@ test_that("heb_fit_shared needs hierarchy and variance_floor", {
   )
 })
 
-test_that("heb_fit_shared effects match an lme4 REML fit with a batch-by-population term", {
+test_that("bn_fit_shared effects match an lme4 REML fit with a batch-by-population term", {
   skip_if_not_installed("lme4")
   s <- hebs_sim()
   eff <- fit_shared_sim(s)$effects
@@ -91,14 +91,14 @@ test_that("a population with no anchor summary abstains", {
   s <- hebs_sim(drop_anchor_pop = "Q")
   model <- fit_shared_sim(s)
   expect_false("Q" %in% model$effects$population)
-  res <- heb_integrate(model, s$x, s$meta, s$pop, TF, unsupported = "abstain")
+  res <- bn_integrate(model, s$x, s$meta, s$pop, TF, unsupported = "abstain")
   expect_true(all(
     res$actions$action[res$actions$population == "Q"] == "abstain"
   ))
   expect_true(all(res$actions$action[res$actions$population == "P"] == "apply"))
 })
 
-test_that("heb_fit_shared stops on a batch that shares no reference with the anchor", {
+test_that("bn_fit_shared stops on a batch that shares no reference with the anchor", {
   s <- hebs_sim()
   s$meta$reference_id[s$meta$batch == "s3_r2"] <- NA
   s$meta$aliquot[s$meta$batch == "s3_r2"] <- NA

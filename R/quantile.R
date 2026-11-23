@@ -1,23 +1,23 @@
-# Two-pass node correction with per-node quantile maps: heb_fit_node_quantile() and its integrate path.
+# Two-pass node correction with per-node quantile maps: bn_fit_node_quantile() and its integrate path.
 #
-# Ported from the tusoskill run heb_nodes_20261121, candidate c016 (decisions T1-T3).
+# Ported from the tusoskill run bn_nodes_20261121, candidate c016 (decisions T1-T3).
 
-.heb_node_quantile_schema_version <- "heb_node_quantile_model/1"
+.bn_node_quantile_schema_version <- "bn_node_quantile_model/1"
 
 #' Fit a two-pass node model with per-node quantile maps
 #'
 #' Batch effects can change the shape of a marker's distribution within a
-#' cell state, not only its location. \code{heb_fit_node_quantile()} runs a
-#' node shift (\code{\link{heb_fit_nodes}}), then refits a second map on the
+#' cell state, not only its location. \code{bn_fit_node_quantile()} runs a
+#' node shift (\code{\link{bn_fit_nodes}}), then refits a second map on the
 #' shifted cells and, in each second-pass node, maps every batch's marker
 #' quantiles onto the anchor's.
 #'
 #' @details
 #' Steps, all on reference cells only:
 #' \enumerate{
-#'   \item Pass 1: \code{\link{heb_fit_nodes}} with the given settings; its
+#'   \item Pass 1: \code{\link{bn_fit_nodes}} with the given settings; its
 #'     correction is applied to the reference cells.
-#'   \item Pass 2: \code{\link{heb_fit_nodes}} again, with the same settings,
+#'   \item Pass 2: \code{\link{bn_fit_nodes}} again, with the same settings,
 #'     on the pass-1 cells. Its node shifts cover the cells pass 2 cannot
 #'     map by quantiles.
 #'   \item For each (batch, pass-2 node) with at least \code{min_cells}
@@ -53,7 +53,7 @@
 #' reference sample; a (batch, node) can therefore have quantiles without a
 #' node shift.
 #'
-#' @inheritParams heb_fit_nodes
+#' @inheritParams bn_fit_nodes
 #' @param quantile_probs Increasing probabilities in (0, 1), at least two,
 #'   at which batch and anchor quantiles are matched.
 #' @param tail Rule beyond the outer quantiles; only \code{"shift"}.
@@ -61,15 +61,15 @@
 #'   shrinkage toward the batch-wide offset curve. Larger values borrow more;
 #'   \code{0} turns shrinkage off. No default: it changes the estimates
 #'   (decision TR3k used 300).
-#' @return A \code{heb_node_quantile_model}: a list with
+#' @return A \code{bn_node_quantile_model}: a list with
 #'   \code{schema_version}, \code{settings}, \code{markers},
 #'   \code{transform}, \code{anchor}, \code{pass1} and \code{pass2} (frozen
-#'   \code{heb_node_model}s), \code{quantiles} (one probabilities-by-markers
+#'   \code{bn_node_model}s), \code{quantiles} (one probabilities-by-markers
 #'   matrix per "batch\\rnode"), \code{software}, \code{created},
 #'   \code{parent_digest} and \code{digest}.
-#' @seealso \code{\link{heb_fit_nodes}}, \code{\link{heb_integrate}}
+#' @seealso \code{\link{bn_fit_nodes}}, \code{\link{bn_integrate}}
 #' @export
-heb_fit_node_quantile <- function(
+bn_fit_node_quantile <- function(
   x,
   samples,
   population,
@@ -79,7 +79,7 @@ heb_fit_node_quantile <- function(
   min_cells,
   unbridged,
   method,
-  heb_settings,
+  eb_settings,
   grid,
   mapping_markers,
   train_cells,
@@ -92,7 +92,7 @@ heb_fit_node_quantile <- function(
   shrink_k,
   sample_ids = NULL
 ) {
-  .heb_stop_missing(c(
+  .bn_stop_missing(c(
     x = missing(x),
     samples = missing(samples),
     population = missing(population),
@@ -102,7 +102,7 @@ heb_fit_node_quantile <- function(
     min_cells = missing(min_cells),
     unbridged = missing(unbridged),
     method = missing(method),
-    heb_settings = missing(heb_settings),
+    eb_settings = missing(eb_settings),
     grid = missing(grid),
     mapping_markers = missing(mapping_markers),
     train_cells = missing(train_cells),
@@ -114,7 +114,7 @@ heb_fit_node_quantile <- function(
     tail = missing(tail),
     shrink_k = missing(shrink_k)
   ))
-  .heb_check_choice(tail, "tail", "shift", what = "heb_fit_node_quantile")
+  .bn_check_choice(tail, "tail", "shift", what = "bn_fit_node_quantile")
   if (
     !is.numeric(quantile_probs) ||
       length(quantile_probs) < 2 ||
@@ -136,14 +136,14 @@ heb_fit_node_quantile <- function(
     stop("'shrink_k' must be one finite number >= 0.", call. = FALSE)
   }
 
-  # Reference rows only, as heb_fit_nodes() uses.
-  d <- .heb_cells(x, samples, population, markers, sample_ids)
+  # Reference rows only, as bn_fit_nodes() uses.
+  d <- .bn_cells(x, samples, population, markers, sample_ids)
   ref_rows <- which(d$cells$is_reference)
   x_ref <- x[ref_rows, , drop = FALSE]
   ids_ref <- d$cells$sample_id[ref_rows]
   pop_ref <- population[ref_rows]
   fit_pass <- function(xp) {
-    heb_fit_nodes(
+    bn_fit_nodes(
       x = xp,
       samples = samples,
       population = pop_ref,
@@ -153,7 +153,7 @@ heb_fit_node_quantile <- function(
       min_cells = min_cells,
       unbridged = unbridged,
       method = method,
-      heb_settings = heb_settings,
+      eb_settings = eb_settings,
       grid = grid,
       mapping_markers = mapping_markers,
       train_cells = train_cells,
@@ -165,7 +165,7 @@ heb_fit_node_quantile <- function(
     )
   }
   integrate_pass <- function(m, xp) {
-    heb_integrate(
+    bn_integrate(
       m,
       xp,
       samples,
@@ -183,7 +183,7 @@ heb_fit_node_quantile <- function(
   nodes <- integrate_pass(pass2, x1)$nodes
 
   # Quantiles per (batch, pass-2 node) with enough pooled reference cells.
-  x1m <- .heb_marker_matrix(x1, markers)
+  x1m <- .bn_marker_matrix(x1, markers)
   groups <- split(
     seq_along(nodes),
     paste(d$cells$batch[ref_rows], nodes, sep = "\r")
@@ -232,7 +232,7 @@ heb_fit_node_quantile <- function(
 
   model <- structure(
     list(
-      schema_version = .heb_node_quantile_schema_version,
+      schema_version = .bn_node_quantile_schema_version,
       settings = list(
         quantile_probs = quantile_probs,
         tail = tail,
@@ -246,19 +246,19 @@ heb_fit_node_quantile <- function(
       pass1 = pass1,
       pass2 = pass2,
       quantiles = quantiles,
-      software = list(R = R.version.string, heb = .heb_pkg_version()),
+      software = list(R = R.version.string, bridgenorm = .bn_pkg_version()),
       created = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
       parent_digest = NA_character_,
       digest = NA_character_
     ),
-    class = "heb_node_quantile_model"
+    class = "bn_node_quantile_model"
   )
-  model$digest <- .heb_digest(model)
+  model$digest <- .bn_digest(model)
   model
 }
 
 # Marker columns of x as a double matrix.
-.heb_marker_matrix <- function(x, markers) {
+.bn_marker_matrix <- function(x, markers) {
   out <- if (is.matrix(x)) {
     x[, markers, drop = FALSE]
   } else {
@@ -268,31 +268,31 @@ heb_fit_node_quantile <- function(
   out
 }
 
-# Stop unless `model` is an intact heb_node_quantile_model with intact passes.
-.heb_validate_node_quantile <- function(model) {
-  if (!identical(model$schema_version, .heb_node_quantile_schema_version)) {
+# Stop unless `model` is an intact bn_node_quantile_model with intact passes.
+.bn_validate_node_quantile <- function(model) {
+  if (!identical(model$schema_version, .bn_node_quantile_schema_version)) {
     stop(
       sprintf(
         "Unsupported schema_version '%s'; this package reads '%s'.",
         as.character(model$schema_version),
-        .heb_node_quantile_schema_version
+        .bn_node_quantile_schema_version
       ),
       call. = FALSE
     )
   }
-  if (!identical(model$digest, .heb_digest(model))) {
+  if (!identical(model$digest, .bn_digest(model))) {
     stop(
       "Digest mismatch: the model changed after it was frozen. Refit, or load the original file.",
       call. = FALSE
     )
   }
-  .heb_validate_node(model$pass1)
-  .heb_validate_node(model$pass2)
+  .bn_validate_node(model$pass1)
+  .bn_validate_node(model$pass2)
   invisible(model)
 }
 
-# heb_integrate() for a heb_node_quantile_model: pass 1, then per-node quantile maps or the pass-2 shift.
-.heb_integrate_node_quantile <- function(
+# bn_integrate() for a bn_node_quantile_model: pass 1, then per-node quantile maps or the pass-2 shift.
+.bn_integrate_node_quantile <- function(
   model,
   x,
   samples,
@@ -301,10 +301,10 @@ heb_fit_node_quantile <- function(
   unsupported,
   sample_ids
 ) {
-  .heb_validate_node_quantile(model)
-  d <- .heb_cells(x, samples, population, model$markers, sample_ids)
+  .bn_validate_node_quantile(model)
+  d <- .bn_cells(x, samples, population, model$markers, sample_ids)
   ids <- d$cells$sample_id
-  r1 <- heb_integrate(
+  r1 <- bn_integrate(
     model$pass1,
     x,
     samples,
@@ -313,7 +313,7 @@ heb_fit_node_quantile <- function(
     "abstain",
     sample_ids = ids
   )
-  r2 <- heb_integrate(
+  r2 <- bn_integrate(
     model$pass2,
     r1$x,
     samples,
@@ -322,8 +322,8 @@ heb_fit_node_quantile <- function(
     "abstain",
     sample_ids = ids
   )
-  v <- .heb_marker_matrix(r1$x, model$markers)
-  out <- .heb_marker_matrix(r2$x, model$markers)
+  v <- .bn_marker_matrix(r1$x, model$markers)
+  out <- .bn_marker_matrix(r2$x, model$markers)
 
   # Quantile map where the cell's batch and the anchor both have quantiles in its pass-2 node.
   key <- paste(d$cells$batch, r2$nodes, sep = "\r")
@@ -360,13 +360,13 @@ heb_fit_node_quantile <- function(
   ] <- "Batch and anchor quantiles in this node; the quantile map was applied."
   actions <- rbind(a1, a2)
 
-  # Keep the pass models as heb_integrate() returned them: they carry effects of new batches.
+  # Keep the pass models as bn_integrate() returned them: they carry effects of new batches.
   updated <- model
   updated$pass1 <- r1$model
   updated$pass2 <- r2$model
   if (!identical(updated, model)) {
     updated$parent_digest <- model$digest
-    updated$digest <- .heb_digest(updated)
+    updated$digest <- .bn_digest(updated)
   }
 
   if (unsupported == "error" && any(actions$action == "abstain")) {
@@ -387,21 +387,21 @@ heb_fit_node_quantile <- function(
 
   structure(
     list(
-      x = .heb_restore(x, out, model$markers),
+      x = .bn_restore(x, out, model$markers),
       actions = actions,
       model = updated,
       nodes = r2$nodes,
       excluded = r2$excluded,
       aliquot_source = d$aliquot_source
     ),
-    class = "heb_result"
+    class = "bn_result"
   )
 }
 
 #' @export
-print.heb_node_quantile_model <- function(x, ...) {
+print.bn_node_quantile_model <- function(x, ...) {
   cat(
-    "<heb_node_quantile_model>",
+    "<bn_node_quantile_model>",
     "| anchor:",
     x$anchor,
     "| nodes per pass:",

@@ -1,8 +1,8 @@
-# heb_fit_paired(): effects against a hand computation, abstention and integration.
+# bn_fit_paired(): effects against a hand computation, abstention and integration.
 
 paired_sim_fit <- function(s, meta = s$meta, unbridged = "stop") {
   x <- s$x[s$x$sample_id %in% meta$sample_id, ]
-  heb_fit_paired(
+  bn_fit_paired(
     x,
     meta,
     population = rep("T", nrow(x)),
@@ -15,7 +15,7 @@ paired_sim_fit <- function(s, meta = s$meta, unbridged = "stop") {
 }
 
 test_that("paired effects equal the mean over donors of aliquot-mean differences to the anchor", {
-  s <- heb_sim()
+  s <- bn_sim()
   eff <- paired_sim_fit(s)$effects
   # Hand computation: aliquot means, donor means per batch, difference to the anchor, mean over donors.
   am <- tapply(s$x$m1, s$x$sample_id, mean)
@@ -33,7 +33,7 @@ test_that("paired effects equal the mean over donors of aliquot-mean differences
 })
 
 test_that("a batch sharing no reference with the anchor is abstained or stops", {
-  s <- heb_sim()
+  s <- bn_sim()
   keep <- !(s$meta$batch == "s1_r1" & s$meta$donor == "D3") &
     !(s$meta$batch == "s3_r2" & s$meta$donor != "D3")
   meta <- s$meta[keep, ]
@@ -42,9 +42,9 @@ test_that("a batch sharing no reference with the anchor is abstained or stops", 
 })
 
 test_that("integrating a paired model subtracts its effects", {
-  s <- heb_sim()
+  s <- bn_sim()
   m <- paired_sim_fit(s)
-  res <- heb_integrate(
+  res <- bn_integrate(
     m,
     s$x,
     s$meta,

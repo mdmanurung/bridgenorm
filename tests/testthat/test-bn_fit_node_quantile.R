@@ -1,4 +1,4 @@
-# heb_fit_node_quantile(): two-pass node correction with per-node quantile maps (tusoskill c016).
+# bn_fit_node_quantile(): two-pass node correction with per-node quantile maps (tusoskill c016).
 
 # Toy data: anchor b1 and batch b2, two reference donors per batch plus one study sample in b2.
 # Two clusters on the mapping marker CD3 (A near 1, B near 4). In b2, marker M is a known monotone
@@ -51,7 +51,7 @@ fit_quantile_sim <- function(s, ...) {
       min_cells = 20,
       unbridged = "stop",
       method = "paired",
-      heb_settings = NULL,
+      eb_settings = NULL,
       grid = c(2, 1),
       mapping_markers = "CD3",
       train_cells = 200,
@@ -65,11 +65,11 @@ fit_quantile_sim <- function(s, ...) {
     ),
     list(...)
   )
-  do.call(heb_fit_node_quantile, args)
+  do.call(bn_fit_node_quantile, args)
 }
 
 integrate_sim <- function(model, s) {
-  heb_integrate(
+  bn_integrate(
     model,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -126,7 +126,7 @@ test_that("a (batch, node) below min_cells pooled reference cells keeps the pass
     min_cells = 70,
     unbridged = "abstain",
     method = "paired",
-    heb_settings = NULL,
+    eb_settings = NULL,
     grid = c(2, 1),
     mapping_markers = "CD3",
     train_cells = 200,
@@ -138,8 +138,8 @@ test_that("a (batch, node) below min_cells pooled reference cells keeps the pass
     tail = "shift",
     shrink_k = 0
   )
-  model <- do.call(heb_fit_node_quantile, args)
-  res <- heb_integrate(
+  model <- do.call(bn_fit_node_quantile, args)
+  res <- bn_integrate(
     model,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -158,12 +158,12 @@ test_that("save and load keep the digest, and a changed quantile table fails", {
   s <- quantile_sim()
   model <- fit_quantile_sim(s)
   path <- tempfile(fileext = ".rds")
-  heb_save(model, path)
-  expect_identical(heb_load(path), model)
+  bn_save(model, path)
+  expect_identical(bn_load(path), model)
   bad <- model
   bad$quantiles[[1]][1, 1] <- bad$quantiles[[1]][1, 1] + 1
   saveRDS(bad, path)
-  expect_error(heb_load(path), "Digest mismatch")
+  expect_error(bn_load(path), "Digest mismatch")
 })
 
 test_that("every estimate-changing argument is required", {
@@ -189,7 +189,7 @@ expect_shrunk_tables <- function(s, raw, shrunk, k) {
   probs <- seq(0.025, 0.975, length.out = 21)
   ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
   integ <- function(m, cells) {
-    heb_integrate(m, cells, s$samples, rep("T", nrow(cells)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+    bn_integrate(m, cells, s$samples, rep("T", nrow(cells)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
   }
   x1 <- integ(raw$pass1, ref)$x
   nodes <- integ(raw$pass2, x1)$nodes
@@ -230,8 +230,8 @@ test_that("shrink_k = 0 leaves every quantile table as fitted", {
   model <- fit_quantile_sim(s, shrink_k = 0)
   probs <- seq(0.025, 0.975, length.out = 21)
   ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
-  x1 <- heb_integrate(model$pass1, ref, s$samples, rep("T", nrow(ref)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$x
-  nodes <- heb_integrate(model$pass2, x1, s$samples, rep("T", nrow(x1)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$nodes
+  x1 <- bn_integrate(model$pass1, ref, s$samples, rep("T", nrow(ref)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$x
+  nodes <- bn_integrate(model$pass2, x1, s$samples, rep("T", nrow(x1)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$nodes
   batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
   g <- names(model$quantiles)[[1]]
   i <- paste(batch, nodes, sep = "\r") == g
@@ -270,7 +270,7 @@ test_that("only batches with exactly the anchor's reference donors get quantile 
   expect_equal(res$x$M[s3], s$x$M[s3], tolerance = 1e-12)
   # Partly bridged b4 takes pass 1 then the pass-2 node shift, with no quantile map.
   r1 <- integrate_sim(model$pass1, s)
-  r2 <- heb_integrate(model$pass2, r1$x, s$samples, rep("T", nrow(s$x)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+  r2 <- bn_integrate(model$pass2, r1$x, s$samples, rep("T", nrow(s$x)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
   s4 <- s$x$sample_id == "S_b4"
   expect_equal(res$x$M[s4], r2$x$M[s4], tolerance = 1e-12)
 })

@@ -10,7 +10,7 @@
 # Negative REML log-likelihood (up to a constant) for log variance components.
 # V = th1 * M1 + th2 * M2 + diag(th3 + D), with M1 = Z K1 Z' and M2 = Z K2 Z'.
 # D holds known sampling variances (residual_model = "known_plus_extra"), else 0.
-.heb_reml <- function(log_theta, y, X, M1, M2, D = 0) {
+.bn_reml <- function(log_theta, y, X, M1, M2, D = 0) {
   th <- exp(log_theta)
   V <- th[[1]] * M1 + th[[2]] * M2 + diag(th[[3]] + D, length(y))
   R <- tryCatch(chol(V), error = function(e) NULL)
@@ -36,7 +36,7 @@
 # anchor_effect = "fixed": the anchor-relative effects b_b = beta_b - beta_anchor are the random
 #   effects, b_anchor = 0 exactly, with covariance
 #   tau_s^2 (S_ij - S_ia - S_ja + 1) + tau_b^2 (delta_ij + 1), S = same-study indicator (v1).
-.heb_design <- function(d, hier, anchor, anchor_effect, residual_model) {
+.bn_design <- function(d, hier, anchor, anchor_effect, residual_model) {
   batches <- sort(unique(d$batch))
   if (length(batches) < 2 || !anchor %in% batches) {
     return(NULL)
@@ -96,7 +96,7 @@
 # rate -> 0) priors on the study and run SDs: -log p(sigma_k) = -0.5 log theta_k, once per pooled
 # set. It keeps them off zero when one donor per batch cannot separate them from the residual.
 # The residual variance is not penalised. "none" is plain REML.
-.heb_theta <- function(designs, variance_floor, variance_prior) {
+.bn_theta <- function(designs, variance_floor, variance_prior) {
   scale <- max(
     mean(vapply(designs, function(z) stats::var(z$y), numeric(1))),
     1e-6
@@ -109,7 +109,7 @@
   obj <- function(lt) {
     sum(vapply(
       designs,
-      function(z) .heb_reml(lt, z$y, z$X, z$M1, z$M2, z$D),
+      function(z) .bn_reml(lt, z$y, z$X, z$M1, z$M2, z$D),
       numeric(1)
     )) +
       penalty(lt)
@@ -143,7 +143,7 @@
 # The form G - G Z'PZ G cancels catastrophically once G / sigma^2 exceeds about 1e6.
 # With known sampling variances D the residual is R = diag(th3 + D), and the unscaled
 # equations are used: C = W' R^-1 W + [0, 0; 0, G^-1], PEV(u) = (C^-1)_uu.
-.heb_pev <- function(z, th) {
+.bn_pev <- function(z, th) {
   G <- th[[1]] * z$K1 + th[[2]] * z$K2
   p <- ncol(z$X)
   W <- cbind(z$X, z$Z)
@@ -168,8 +168,8 @@
 # BLUPs, prediction error and Satterthwaite df for one design at given components.
 # df = 2 v^2 / (g' C g), v the contrast's prediction error variance, g its gradient in the
 # log components (central differences) and C their covariance. cov_log = NULL gives df = NA.
-.heb_blup <- function(z, th, anchor, cov_log = NULL) {
-  p <- .heb_pev(z, th)
+.bn_blup <- function(z, th, anchor, cov_log = NULL) {
+  p <- .bn_pev(z, th)
   df <- rep(NA_real_, length(z$batches))
   if (!is.null(cov_log)) {
     h <- 1e-4
@@ -181,7 +181,7 @@
           return(rep(0, length(p$var)))
         }
         step <- replace(rep(0, nk), k, h)
-        (.heb_pev(z, th * exp(step))$var - .heb_pev(z, th * exp(-step))$var) /
+        (.bn_pev(z, th * exp(step))$var - .bn_pev(z, th * exp(-step))$var) /
           (2 * h)
       },
       numeric(length(p$var))
@@ -200,7 +200,7 @@
 }
 
 # Fit pooled variance components, then the BLUP contrasts of every design (named list).
-.heb_fit_designs <- function(
+.bn_fit_designs <- function(
   designs,
   pool,
   anchor,
@@ -216,7 +216,7 @@
   names(pool_key) <- names(designs)
   theta <- lapply(
     split(designs, pool_key),
-    .heb_theta,
+    .bn_theta,
     variance_floor = variance_floor,
     variance_prior = variance_prior
   )
@@ -225,7 +225,7 @@
     z <- designs[[nm]]
     # A singular system (e.g. one reference per batch with near-zero shifts) stops with its design named.
     tryCatch(
-      c(.heb_blup(z, tk$theta, anchor, tk$cov_log), list(theta = tk$theta)),
+      c(.bn_blup(z, tk$theta, anchor, tk$cov_log), list(theta = tk$theta)),
       error = function(e) {
         stop(
           sprintf(
@@ -250,7 +250,7 @@
 # summary (known sampling variance 1 / (2 (n - 1))). delta_b is the BLUP log-SD contrast to the
 # anchor; the correction multiplies deviations from the batch's shifted reference median by
 # scale = exp(-delta_b). Batches without reference cells in a population get no scale (NA).
-.heb_scale <- function(
+.bn_scale <- function(
   effects,
   xm,
   cells,
@@ -289,7 +289,7 @@
   ls <- ls[is.finite(ls$value), , drop = FALSE]
   key <- paste(ls$population, ls$marker, sep = "\r")
   designs <- lapply(split(seq_len(nrow(ls)), key), function(ii) {
-    .heb_design(
+    .bn_design(
       ls[ii, , drop = FALSE],
       hierarchy,
       anchor,
@@ -298,7 +298,7 @@
     )
   })
   designs <- designs[!vapply(designs, is.null, logical(1))]
-  blups <- .heb_fit_designs(
+  blups <- .bn_fit_designs(
     designs,
     pool,
     anchor,

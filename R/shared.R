@@ -12,7 +12,7 @@
 # with a zero deviation (w has no data there, so its BLUP is 0).
 
 # Negative REML log-likelihood (up to a constant); Zq is a list of tcrossprod(Z) matrices.
-.hebs_reml <- function(log_theta, y, X, Zq) {
+.bns_reml <- function(log_theta, y, X, Zq) {
   th <- exp(log_theta)
   V <- th[[length(th)]] * diag(length(y))
   for (i in seq_along(Zq)) {
@@ -35,7 +35,7 @@
 }
 
 # Design for one marker: all populations together. NULL when no contrast to the anchor exists.
-.hebs_design <- function(d, hier, anchor) {
+.bns_design <- function(d, hier, anchor) {
   batches <- sort(unique(d$batch))
   if (length(batches) < 2 || !anchor %in% batches) {
     return(NULL)
@@ -73,13 +73,13 @@
 }
 
 # Variance components (study, run, deviation, error) for one marker by REML.
-.hebs_theta <- function(z, variance_floor) {
+.bns_theta <- function(z, variance_floor) {
   Zq <- lapply(z$Z, tcrossprod)
   scale <- max(stats::var(z$y), 1e-6)
   lo <- rep(log(variance_floor), 4)
   fit <- stats::optim(
     log(scale * c(0.1, 0.1, 0.1, 0.5)),
-    function(lt) .hebs_reml(lt, z$y, z$X, Zq),
+    function(lt) .bns_reml(lt, z$y, z$X, Zq),
     method = "L-BFGS-B",
     lower = lo,
     upper = lo + 40
@@ -88,7 +88,7 @@
 }
 
 # BLUPs of the effect for every (batch, emitted population) at given variance components.
-.hebs_blup <- function(z, th, anchor, emit_pops) {
+.bns_blup <- function(z, th, anchor, emit_pops) {
   y <- z$y
   X <- z$X
   Z <- do.call(cbind, z$Z)
@@ -128,14 +128,14 @@
 }
 
 # Effects of the shared model for every marker.
-.hebs_effects <- function(summ, hierarchy, anchor, emit_pops, variance_floor) {
+.bns_effects <- function(summ, hierarchy, anchor, emit_pops, variance_floor) {
   rows <- lapply(split(seq_len(nrow(summ)), summ$marker), function(ii) {
     d <- summ[ii, , drop = FALSE]
-    z <- .hebs_design(d, hierarchy, anchor)
+    z <- .bns_design(d, hierarchy, anchor)
     if (is.null(z)) {
       return(NULL)
     }
-    r <- .hebs_blup(z, .hebs_theta(z, variance_floor), anchor, emit_pops)
+    r <- .bns_blup(z, .bns_theta(z, variance_floor), anchor, emit_pops)
     n_don <- mapply(
       function(b, k) {
         length(unique(d$reference_id[d$batch == b & d$population == k]))

@@ -1,15 +1,15 @@
-# Node-level correction: heb_fit_nodes() and its integrate path.
+# Node-level correction: bn_fit_nodes() and its integrate path.
 #
 # Ported from experiments/data set A/27_som-grid.R (SOM grid sweep, decisions SG1-SG4, N1-N3).
 
-.heb_node_schema_version <- "heb_node_model/1"
+.bn_node_schema_version <- "bn_node_model/1"
 
 #' Fit a node-level batch-correction model
 #'
-#' Batch effects often differ between cell states. \code{heb_fit_nodes()}
+#' Batch effects often differ between cell states. \code{bn_fit_nodes()}
 #' learns a self-organising map (SOM) on the reference cells and fits the
-#' chosen estimator (paired shift or \code{\link{heb_fit}}) separately in each
-#' map node, with the node as the population. \code{\link{heb_integrate}} then
+#' chosen estimator (paired shift or \code{\link{bn_fit}}) separately in each
+#' map node, with the node as the population. \code{\link{bn_integrate}} then
 #' assigns every cell to its nearest node and subtracts that node's effect.
 #'
 #' @details
@@ -37,7 +37,7 @@
 #'
 #' The training cells are drawn by position within each reference sample, so
 #' for a given \code{seed} the map depends on the row order of \code{x}
-#' within a sample. \code{heb_fit_nodes()} restores the caller's random
+#' within a sample. \code{bn_fit_nodes()} restores the caller's random
 #' number stream on exit.
 #'
 #' Every argument that changes an estimate is required, with no default; the
@@ -46,15 +46,15 @@
 #' \code{settings$som}.
 #' Needs the \pkg{kohonen} package.
 #'
-#' @inheritParams heb_fit
-#' @param method \code{"paired"} (\code{\link{heb_fit_paired}}) or
-#'   \code{"heb"} (\code{\link{heb_fit}}).
-#' @param heb_settings For \code{method = "heb"}: a named list with
-#'   \code{hierarchy} and every model setting of \code{\link{heb_fit}}
+#' @inheritParams bn_fit
+#' @param method \code{"paired"} (\code{\link{bn_fit_paired}}) or
+#'   \code{"eb"} (\code{\link{bn_fit}}).
+#' @param eb_settings For \code{method = "eb"}: a named list with
+#'   \code{hierarchy} and every model setting of \code{\link{bn_fit}}
 #'   (\code{variance_floor} to \code{batch_shrinkage_tau2}). \code{NULL} for
 #'   \code{"paired"}.
 #' @param unbridged \code{"stop"} or \code{"abstain"}, as in
-#'   \code{\link{heb_fit}}.
+#'   \code{\link{bn_fit}}.
 #' @param grid SOM grid as \code{c(xdim, ydim)}.
 #' @param mapping_markers Markers that define cell state for the map; each
 #'   must be one of \code{markers}, so it is pre-shifted.
@@ -63,16 +63,16 @@
 #' @param seed Seed for the training-cell draw and the SOM.
 #' @param assignment How cells are assigned to nodes; only \code{"nearest"}.
 #' @param fallback \code{"global"} or \code{"abstain"}; see Details.
-#' @return A \code{heb_node_model}: a list with \code{schema_version},
+#' @return A \code{bn_node_model}: a list with \code{schema_version},
 #'   \code{method}, \code{settings}, \code{markers}, \code{transform},
 #'   \code{anchor}, \code{map} (\code{centre}, \code{scale}, \code{nodes},
 #'   \code{labels}, \code{mapping_markers}), \code{global_paired},
-#'   \code{global} and \code{local} (frozen \code{heb_model}s),
+#'   \code{global} and \code{local} (frozen \code{bn_model}s),
 #'   \code{software}, \code{created} and \code{digest}.
-#' @seealso \code{\link{heb_fit}}, \code{\link{heb_fit_paired}},
-#'   \code{\link{heb_integrate}}
+#' @seealso \code{\link{bn_fit}}, \code{\link{bn_fit_paired}},
+#'   \code{\link{bn_integrate}}
 #' @export
-heb_fit_nodes <- function(
+bn_fit_nodes <- function(
   x,
   samples,
   population,
@@ -82,7 +82,7 @@ heb_fit_nodes <- function(
   min_cells,
   unbridged,
   method,
-  heb_settings,
+  eb_settings,
   grid,
   mapping_markers,
   train_cells,
@@ -92,7 +92,7 @@ heb_fit_nodes <- function(
   fallback,
   sample_ids = NULL
 ) {
-  .heb_stop_missing(c(
+  .bn_stop_missing(c(
     x = missing(x),
     samples = missing(samples),
     population = missing(population),
@@ -102,7 +102,7 @@ heb_fit_nodes <- function(
     min_cells = missing(min_cells),
     unbridged = missing(unbridged),
     method = missing(method),
-    heb_settings = missing(heb_settings),
+    eb_settings = missing(eb_settings),
     grid = missing(grid),
     mapping_markers = missing(mapping_markers),
     train_cells = missing(train_cells),
@@ -113,31 +113,31 @@ heb_fit_nodes <- function(
   ))
   if (!requireNamespace("kohonen", quietly = TRUE)) {
     stop(
-      "heb_fit_nodes() needs the 'kohonen' package: install.packages(\"kohonen\").",
+      "bn_fit_nodes() needs the 'kohonen' package: install.packages(\"kohonen\").",
       call. = FALSE
     )
   }
-  .heb_check_choice(
+  .bn_check_choice(
     method,
     "method",
-    c("paired", "heb"),
-    what = "heb_fit_nodes"
+    c("paired", "eb"),
+    what = "bn_fit_nodes"
   )
-  .heb_check_choice(assignment, "assignment", "nearest", what = "heb_fit_nodes")
-  .heb_check_choice(
+  .bn_check_choice(assignment, "assignment", "nearest", what = "bn_fit_nodes")
+  .bn_check_choice(
     fallback,
     "fallback",
     c("global", "abstain"),
-    what = "heb_fit_nodes"
+    what = "bn_fit_nodes"
   )
-  if (method == "heb" && !is.list(heb_settings)) {
+  if (method == "eb" && !is.list(eb_settings)) {
     stop(
-      "method = \"heb\" needs 'heb_settings', a list of heb_fit() settings.",
+      "method = \"eb\" needs 'eb_settings', a list of bn_fit() settings.",
       call. = FALSE
     )
   }
-  if (method == "paired" && !is.null(heb_settings)) {
-    stop("method = \"paired\" takes heb_settings = NULL.", call. = FALSE)
+  if (method == "paired" && !is.null(eb_settings)) {
+    stop("method = \"paired\" takes eb_settings = NULL.", call. = FALSE)
   }
   if (
     !is.numeric(grid) ||
@@ -185,8 +185,8 @@ heb_fit_nodes <- function(
     )
   }
 
-  # Reference rows only: every fit and the map use them, as heb_fit() does.
-  d <- .heb_cells(x, samples, population, markers, sample_ids)
+  # Reference rows only: every fit and the map use them, as bn_fit() does.
+  d <- .bn_cells(x, samples, population, markers, sample_ids)
   ref_rows <- which(d$cells$is_reference)
   x_ref <- x[ref_rows, , drop = FALSE]
   ids_ref <- d$cells$sample_id[ref_rows]
@@ -204,20 +204,20 @@ heb_fit_nodes <- function(
       sample_ids = ids_ref
     )
     if (fit_method == "paired") {
-      do.call(heb_fit_paired, args)
+      do.call(bn_fit_paired, args)
     } else {
-      do.call(heb_fit, c(args, heb_settings))
+      do.call(bn_fit, c(args, eb_settings))
     }
   }
   global_paired <- fit_one("paired", pop_ref, unbridged)
   global <- if (method == "paired") {
     global_paired
   } else {
-    fit_one("heb", pop_ref, unbridged)
+    fit_one("eb", pop_ref, unbridged)
   }
 
   # Map: trained on reference cells after the global paired shift.
-  mapped_ref <- .heb_node_mapping_data(
+  mapped_ref <- .bn_node_mapping_data(
     global_paired,
     x_ref,
     samples,
@@ -268,13 +268,13 @@ heb_fit_nodes <- function(
   )
 
   # Node fits: every reference cell labelled by its nearest node.
-  node_ref <- map$labels[.heb_node_nearest(mapped_ref, map)]
+  node_ref <- map$labels[.bn_node_nearest(mapped_ref, map)]
   # Node fits abstain on batches without node summaries; the fallback covers them.
   local <- fit_one(method, node_ref, "abstain")
 
   model <- structure(
     list(
-      schema_version = .heb_node_schema_version,
+      schema_version = .bn_node_schema_version,
       method = method,
       settings = list(
         grid = as.integer(grid),
@@ -283,7 +283,7 @@ heb_fit_nodes <- function(
         seed = seed,
         assignment = assignment,
         fallback = fallback,
-        heb_settings = heb_settings,
+        eb_settings = eb_settings,
         # kohonen settings left at their defaults, recorded so the map can be rebuilt.
         som = list(
           kohonen = as.character(utils::packageVersion("kohonen")),
@@ -300,20 +300,20 @@ heb_fit_nodes <- function(
       global_paired = global_paired,
       global = global,
       local = local,
-      software = list(R = R.version.string, heb = .heb_pkg_version()),
+      software = list(R = R.version.string, bridgenorm = .bn_pkg_version()),
       created = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
       parent_digest = NA_character_,
       digest = NA_character_
     ),
-    class = "heb_node_model"
+    class = "bn_node_model"
   )
-  model$digest <- .heb_digest(model)
+  model$digest <- .bn_digest(model)
   model
 }
 
 # Mapping markers after the global paired shift; cells the global model abstains on stay raw.
-# Returns the mapped matrix (x) and the global paired model as heb_integrate() returned it (model).
-.heb_node_mapping_data <- function(
+# Returns the mapped matrix (x) and the global paired model as bn_integrate() returned it (model).
+.bn_node_mapping_data <- function(
   global_paired,
   x,
   samples,
@@ -322,7 +322,7 @@ heb_fit_nodes <- function(
   transform,
   sample_ids
 ) {
-  res <- heb_integrate(
+  res <- bn_integrate(
     global_paired,
     x,
     samples,
@@ -342,7 +342,7 @@ heb_fit_nodes <- function(
 }
 
 # Index of the nearest node for each row of `mapped` (squared Euclidean distance, ties to the first node).
-.heb_node_nearest <- function(mapped, map) {
+.bn_node_nearest <- function(mapped, map) {
   z <- sweep(sweep(mapped, 2, map$centre, "-"), 2, map$scale, "/")
   d <- outer(rowSums(z^2), rowSums(map$nodes^2), "+") -
     2 * tcrossprod(z, map$nodes)
@@ -350,32 +350,32 @@ heb_fit_nodes <- function(
   max.col(-d, ties.method = "first")
 }
 
-# Stop unless `model` is an intact heb_node_model with intact component models.
-.heb_validate_node <- function(model) {
-  if (!identical(model$schema_version, .heb_node_schema_version)) {
+# Stop unless `model` is an intact bn_node_model with intact component models.
+.bn_validate_node <- function(model) {
+  if (!identical(model$schema_version, .bn_node_schema_version)) {
     stop(
       sprintf(
         "Unsupported schema_version '%s'; this package reads '%s'.",
         as.character(model$schema_version),
-        .heb_node_schema_version
+        .bn_node_schema_version
       ),
       call. = FALSE
     )
   }
-  if (!identical(model$digest, .heb_digest(model))) {
+  if (!identical(model$digest, .bn_digest(model))) {
     stop(
       "Digest mismatch: the model changed after it was frozen. Refit, or load the original file.",
       call. = FALSE
     )
   }
-  .heb_validate(model$global_paired)
-  .heb_validate(model$global)
-  .heb_validate(model$local)
+  .bn_validate(model$global_paired)
+  .bn_validate(model$global)
+  .bn_validate(model$local)
   invisible(model)
 }
 
-# heb_integrate() for a heb_node_model: nearest-node effects, with the global model as fallback.
-.heb_integrate_nodes <- function(
+# bn_integrate() for a bn_node_model: nearest-node effects, with the global model as fallback.
+.bn_integrate_nodes <- function(
   model,
   x,
   samples,
@@ -384,10 +384,10 @@ heb_fit_nodes <- function(
   unsupported,
   sample_ids
 ) {
-  .heb_validate_node(model)
-  d <- .heb_cells(x, samples, population, model$markers, sample_ids)
+  .bn_validate_node(model)
+  d <- .bn_cells(x, samples, population, model$markers, sample_ids)
   ids <- d$cells$sample_id
-  mapping <- .heb_node_mapping_data(
+  mapping <- .bn_node_mapping_data(
     model$global_paired,
     x,
     samples,
@@ -396,9 +396,9 @@ heb_fit_nodes <- function(
     transform,
     ids
   )
-  nodes <- model$map$labels[.heb_node_nearest(mapping$x, model$map)]
+  nodes <- model$map$labels[.bn_node_nearest(mapping$x, model$map)]
 
-  local <- heb_integrate(
+  local <- bn_integrate(
     model$local,
     x,
     samples,
@@ -407,7 +407,7 @@ heb_fit_nodes <- function(
     "abstain",
     sample_ids = ids
   )
-  global <- heb_integrate(
+  global <- bn_integrate(
     model$global,
     x,
     samples,
@@ -481,7 +481,7 @@ heb_fit_nodes <- function(
     )
   }
 
-  # Keep the component models as heb_integrate() returned them: they carry effects of new batches.
+  # Keep the component models as bn_integrate() returned them: they carry effects of new batches.
   updated <- model
   updated$global_paired <- mapping$model
   updated$global <- if (model$method == "paired") {
@@ -492,7 +492,7 @@ heb_fit_nodes <- function(
   updated$local <- local$model
   if (!identical(updated, model)) {
     updated$parent_digest <- model$digest
-    updated$digest <- .heb_digest(updated)
+    updated$digest <- .bn_digest(updated)
   }
 
   if (unsupported == "error" && any(actions$action == "abstain")) {
@@ -512,21 +512,21 @@ heb_fit_nodes <- function(
 
   structure(
     list(
-      x = .heb_restore(x, out, model$markers),
+      x = .bn_restore(x, out, model$markers),
       actions = actions,
       model = updated,
       nodes = nodes,
       excluded = local$excluded,
       aliquot_source = d$aliquot_source
     ),
-    class = "heb_result"
+    class = "bn_result"
   )
 }
 
 #' @export
-print.heb_node_model <- function(x, ...) {
+print.bn_node_model <- function(x, ...) {
   cat(
-    "<heb_node_model>",
+    "<bn_node_model>",
     x$method,
     "| anchor:",
     x$anchor,

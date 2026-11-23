@@ -1,10 +1,23 @@
-# heb
+# bridgenorm
 
-Hierarchical empirical Bayes batch correction for cytometry, estimated from repeated reference samples.
+Batch correction for cytometry from bridge samples: reference material from the same donor measured in every batch.
 
-For each population and marker, `heb_fit()` fits a linear mixed model to aliquot means of the reference samples. Donor effects are fixed. Study and batch effects are random. Variance components come from REML. The correction of a batch is the BLUP of its batch effect minus that of the anchor batch. `heb_fit_shared()` fits one model per marker instead, with a batch effect shared across populations plus a per-population deviation.
+The differences between bridge samples measure the technical batch effect. bridgenorm estimates the batch effect from them alone, so study samples never enter a fit and their biology cannot be removed as batch effect. Each batch is corrected toward one anchor batch. A fitted model is frozen with a digest, so it applies to new data without changing earlier corrections.
 
-`heb_integrate()` applies a frozen model. A batch the model has not seen gets a paired-reference shift against the frozen anchor means. Earlier effects never change. A batch with no reference shared with the anchor is left raw and flagged.
+## Methods
+
+`bn_fit_node_quantile()` is the main method. It works on reference cells only, in two passes:
+
+1. A self-organising map (SOM) on the mapping markers splits cells into nodes (cell states). Each batch gets a paired shift per node, which is the mean bridge-sample difference from the anchor (`bn_fit_nodes()`).
+2. A second map is fitted on the shifted cells. In each (batch, node), the batch's marker quantiles are mapped onto the anchor's. This corrects changes in the shape of a distribution, not only its location. The offset curve of a small node is shrunk toward the batch-wide curve with weight n / (n + `shrink_k`).
+
+Only batches whose bridge donors equal the anchor's get quantile maps. A batch that shares no bridge donor with the anchor is left raw and flagged.
+
+Simpler models are available as baselines:
+
+- `bn_fit_paired()`: one paired shift per population and marker. Every other model must beat this baseline.
+- `bn_fit()`: a linear mixed model per population and marker. Donor effects are fixed, and study and batch effects are random, with variance components from REML. A batch's correction is its batch-effect BLUP minus the anchor's.
+- `bn_fit_shared()`: one mixed model per marker, with a batch effect shared across populations.
 
 Every setting that can change an estimate is a required argument with no default.
 
@@ -19,39 +32,28 @@ remotes::install_github("mdmanurung/bridgenorm")
 ```r
 samples <- data.frame(
   sample_id = ..., batch = ...,
-  reference_id = ..., # NA for samples that are not references
+  reference_id = ..., # bridge donor; NA for study samples
   aliquot = ...       # optional
 )
-heb_bridges(samples, anchor = "b1")
+bn_bridges(samples, anchor = "b1")
 
-model <- heb_fit(
-  x, samples, population = labels, markers = c("CD3", "CD4"),
+model <- bn_fit_node_quantile(
+  x, samples, population = labels, markers = markers,
   transform = list(name = "asinh", cofactor = 6000), anchor = "b1",
-  hierarchy = data.frame(batch = ..., study = ...), min_cells = 50,
-  unbridged = "abstain", variance_floor = 1e-8, pool = "population",
-  anchor_effect = "random", variance_prior = "boundary_avoiding",
-  residual_model = "known_plus_extra", scale_model = "none",
-  moderation = "none", moderation_centre = "fitted", moderation_variance = "pev",
-  batch_shrinkage = "blup", batch_shrinkage_centre = "study",
-  batch_shrinkage_group = "study", batch_shrinkage_tau2 = "profile"
+  min_cells = 50, unbridged = "abstain", method = "paired", eb_settings = NULL,
+  grid = c(6, 6), mapping_markers = mapping, train_cells = 5000, rlen = 100,
+  seed = 1, assignment = "nearest", fallback = "global",
+  quantile_probs = seq(0.025, 0.975, length.out = 21), tail = "shift",
+  shrink_k = 300
 )
-res <- heb_integrate(model, x, samples, labels, transform = model$transform, unsupported = "abstain")
-
-# Before choosing the anchor: reference noise per batch (report only).
-noise <- heb_reference_noise(x, samples, population = labels, markers = c("CD3", "CD4"),
-  transform = list(name = "asinh", cofactor = 6000), min_cells = 50)
-
-# The baseline every heb model must beat: paired shift, no shrinkage.
-paired <- heb_fit_paired(x, samples, population = labels, markers = c("CD3", "CD4"),
-  transform = list(name = "asinh", cofactor = 6000), anchor = "b1", min_cells = 50,
-  unbridged = "abstain")
-heb_save(model, "heb_model.rds")
+res <- bn_integrate(model, x, samples, labels, transform = model$transform, unsupported = "abstain")
+bn_save(model, "bn_model.rds")
 ```
 
-The values above show the shape of a call. They are not recommendations.
+The values above show the shape of a call. They are not recommendations. See the Get started article for a worked example.
 
 ## Origin
 
-Ported from the `heb` and `heb_shared` engines of SpectraWeaveR (`R/corrector_heb.R`, `R/corrector_heb_shared.R`, `R/corrector_paired_shift.R`, `R/corrector.R`). The internal-anchor option was left out: it failed its real-data check (plan A14) and was dropped on 2026-11-20. On the SpectraWeaveR test simulations, all 32 combinations of `pool`, `anchor_effect`, `variance_prior`, `residual_model` and `scale_model` give the same effects and corrected values as SpectraWeaveR, to the last bit.
+bridgenorm was called heb (hierarchical empirical Bayes) up to version 0.7.2. The mixed-model fits are ported from the `heb` and `heb_shared` engines of SpectraWeaveR (`R/corrector_heb.R`, `R/corrector_heb_shared.R`, `R/corrector_paired_shift.R`, `R/corrector.R`). On the SpectraWeaveR test simulations, all 32 combinations of `pool`, `anchor_effect`, `variance_prior`, `residual_model` and `scale_model` give the same effects and corrected values as SpectraWeaveR, to the last bit. The internal-anchor option was left out: it failed its real-data check (plan A14) and was dropped on 2026-11-20.
 
 One intended difference: with `unbridged = "abstain"`, a batch whose references were never measured in the anchor batch gets no effect. SpectraWeaveR still fitted an effect for such a batch through its donors in other batches, although its documentation said it would not.

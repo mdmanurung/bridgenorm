@@ -1,3 +1,10 @@
+# bridgenorm 0.8.0
+
+* The package is renamed from heb to bridgenorm. Exported functions, classes and schema strings change prefix
+  from `heb_` to `bn_` (`heb_fit_node_quantile()` is now `bn_fit_node_quantile()`, and so on). The `heb_settings`
+  argument of `bn_fit_nodes()` is now `eb_settings`, and the mixed-model method value `"heb"` is now `"eb"`
+  (`"heb_shared"` is now `"eb_shared"`). Models saved by heb do not load; refit them. Estimates are unchanged.
+
 # heb 0.7.2
 
 * `heb_fit_node_quantile()` builds quantile tables only for batches whose reference donors (`reference_id`) are

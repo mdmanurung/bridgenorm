@@ -12,7 +12,7 @@
 
 # Moderate one vector of effects; returns estimate, weight, tau2, centre and status.
 # tau2 = NULL fits the prior variance; a number uses it as given.
-.heb_moderate <- function(y, s2, method, centre, tau2 = NULL) {
+.bn_moderate <- function(y, s2, method, centre, tau2 = NULL) {
   given_tau2 <- tau2
   # A marker with zero (or unknown) sampling variance cannot be weighed; it is left as it is.
   valid <- is.finite(y) & is.finite(s2) & s2 > 0
@@ -36,7 +36,7 @@
     0.5 * sum(log(sv + t) + (yv - mean_at(t))^2 / (sv + t))
   }
   tau2 <- if (is.null(given_tau2)) {
-    .heb_fit_tau2(yv, sv, profile, centre)
+    .bn_fit_tau2(yv, sv, profile, centre)
   } else {
     given_tau2
   }
@@ -54,7 +54,7 @@
 
 # Cell-only sampling variance of each batch-minus-anchor contrast: per donor, the variance of
 # its mean of aliquot means is sum(var_mean) / k^2; the contrast averages the shared donors.
-.heb_cell_variance <- function(summ, anchor) {
+.bn_cell_variance <- function(summ, anchor) {
   donor_var <- summ |>
     dplyr::summarise(
       v = sum(.data$var_mean) / dplyr::n()^2,
@@ -77,7 +77,7 @@
 }
 
 # Moderate the effects table of a fit; "none" returns it unchanged.
-.heb_moderate_effects <- function(
+.bn_moderate_effects <- function(
   effects,
   summ,
   anchor,
@@ -91,7 +91,7 @@
   s2 <- if (variance == "pev") {
     effects$se_donor^2
   } else {
-    cv <- .heb_cell_variance(summ, anchor)
+    cv <- .bn_cell_variance(summ, anchor)
     cv$cell_var[match(
       paste(effects$batch, effects$population, effects$marker, sep = "\r"),
       paste(cv$batch, cv$population, cv$marker, sep = "\r")
@@ -106,7 +106,7 @@
   key <- paste(effects$batch, effects$population, sep = "\r")
   rows <- split(which(effects$batch != anchor), key[effects$batch != anchor])
   for (ii in rows) {
-    r <- .heb_moderate(effects$estimate[ii], s2[ii], moderation, centre)
+    r <- .bn_moderate(effects$estimate[ii], s2[ii], moderation, centre)
     effects$estimate[ii] <- r$estimate
     effects$moderation_weight[ii] <- r$weight
     effects$moderation_tau2[ii] <- r$tau2
@@ -117,7 +117,7 @@
 }
 
 # Profile-ML prior variance: log-grid scan, log-scale refine, then compared with tau2 = 0.
-.heb_fit_tau2 <- function(yv, sv, profile, centre) {
+.bn_fit_tau2 <- function(yv, sv, profile, centre) {
   upper <- max(stats::var(yv) * 100, max(sv), 1e-8)
   # A zero centre must reach a shift shared by every marker.
   if (centre == "zero") {
@@ -146,7 +146,7 @@
 # Well (aliquot) variance beyond cell sampling, per population and marker: the pooled variance of
 # aliquot means within donor and batch (groups with 2+ aliquots) minus their mean var(cells)/n,
 # floored at 0. Batches with one aliquot borrow it (roadmap R2, user choice R2c).
-.heb_well_variance <- function(summ) {
+.bn_well_variance <- function(summ) {
   multi <- summ |>
     dplyr::mutate(
       dev = .data$value - mean(.data$value),
@@ -183,8 +183,8 @@
 # Shrinkage across batches (roadmap R2): each batch's unshrunk paired contrast y (variance
 # cell + well) is moderated across the batches of its group, per population and marker.
 # centre "study": toward the study's precision-weighted mean; "zero": toward the anchor.
-# tau2 "profile": fitted by .heb_moderate; "reml": the batch variance of the heb fit.
-.heb_batch_shrink <- function(
+# tau2 "profile": fitted by .bn_moderate; "reml": the batch variance of the bn_fit() fit.
+.bn_batch_shrink <- function(
   effects,
   summ,
   hierarchy,
@@ -198,11 +198,11 @@
   if (method == "blup") {
     return(effects)
   }
-  donor <- .heb_donor_level(summ)
-  paired <- .heb_paired_effects(donor, .heb_targets(donor, anchor), "fit") |>
+  donor <- .bn_donor_level(summ)
+  paired <- .bn_paired_effects(donor, .bn_targets(donor, anchor), "fit") |>
     dplyr::filter(.data$batch != anchor)
-  cv <- .heb_cell_variance(summ, anchor)
-  wv <- .heb_well_variance(summ)
+  cv <- .bn_cell_variance(summ, anchor)
+  wv <- .bn_well_variance(summ)
   paired <- paired |>
     dplyr::left_join(
       cv,
@@ -254,7 +254,7 @@
       rep(0, length(ii))
     }
     ctr <- if (centre == "study" && group == "study") "fitted" else "zero"
-    r <- .heb_moderate(y - mu_s, s2, method, ctr, tau2 = t2)
+    r <- .bn_moderate(y - mu_s, s2, method, ctr, tau2 = t2)
     paired$shrunk[ii] <- r$estimate + mu_s
     paired$weight[ii] <- r$weight
     paired$tau2[ii] <- r$tau2

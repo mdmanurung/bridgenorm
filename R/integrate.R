@@ -1,4 +1,4 @@
-# Apply a frozen model: bn_integrate().
+# Apply a frozen model: bn_apply().
 #
 # Ported from SpectraWeaveR R/corrector.R (sw_corrector_integrate, .sw_apply_effects).
 
@@ -23,15 +23,14 @@
 #' }
 #' Abstain keeps the original value exactly.
 #'
-#' @param model A \code{bn_model}.
+#' @param model A model from \code{\link{bn_fit}} or \code{\link{bn_fit_paired}}.
 #' @param x Data in the same form as for \code{\link{bn_fit}}.
 #' @param samples Sample table covering every sample in \code{x}.
 #' @param population Per-cell population labels for \code{x}.
-#' @param transform The scale \code{x} is on. It must equal the model's.
-#'   **Required.**
+#' @param transform The scale \code{x} is on; it must equal the model's.
+#'   Defaults to the model's own transform.
 #' @param unsupported \code{"abstain"} keeps uncorrectable values and
 #'   reports them; \code{"error"} stops when any action is an abstention.
-#'   **Required, no default.**
 #' @param sample_ids Optional sample id per row; required for a matrix
 #'   \code{x}.
 #'
@@ -44,32 +43,30 @@
 #'   and \code{aliquot_source}.
 #' @seealso \code{\link{bn_fit}}
 #' @export
-bn_integrate <- function(
+bn_apply <- function(
   model,
   x,
   samples,
   population,
-  transform,
-  unsupported,
+  transform = model$transform,
+  unsupported = "abstain",
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
     model = missing(model),
     x = missing(x),
     samples = missing(samples),
-    population = missing(population),
-    transform = missing(transform),
-    unsupported = missing(unsupported)
+    population = missing(population)
   ))
   .bn_check_choice(
     unsupported,
     "unsupported",
     c("abstain", "error"),
-    what = "bn_integrate"
+    what = "bn_apply"
   )
-  # A two-pass quantile model (bn_fit_node_quantile) applies its node passes and quantile maps.
+  # A two-pass quantile model (bn_fit) applies its node passes and quantile maps.
   if (inherits(model, "bn_node_quantile_model")) {
-    return(.bn_integrate_node_quantile(
+    return(.bn_apply_node_quantile(
       model,
       x,
       samples,
@@ -79,9 +76,9 @@ bn_integrate <- function(
       sample_ids
     ))
   }
-  # A node-level model (bn_fit_nodes) assigns cells to nodes, then applies its component models.
+  # A node-level model (.bn_fit_nodes) assigns cells to nodes, then applies its component models.
   if (inherits(model, "bn_node_model")) {
-    return(.bn_integrate_nodes(
+    return(.bn_apply_nodes(
       model,
       x,
       samples,
@@ -141,14 +138,6 @@ bn_integrate <- function(
   # Extend a copy; the input model and its effects stay as they were.
   updated <- model
   if (nrow(new_eff) > 0) {
-    # A moderated model records new-batch paired rows as unmoderated.
-    if ("estimate_raw" %in% names(model$effects)) {
-      new_eff$estimate_raw <- new_eff$estimate
-      new_eff$moderation_weight <- 1
-      new_eff$moderation_tau2 <- NA_real_
-      new_eff$moderation_centre <- NA_real_
-      new_eff$moderation_status <- "new_batch_paired"
-    }
     added <- sort(unique(new_eff$batch))
     updated$effects <- dplyr::bind_rows(model$effects, new_eff)
     updated$known_batches <- sort(c(model$known_batches, added))
@@ -226,9 +215,7 @@ bn_integrate <- function(
     marker = rep(markers, nrow(groups)),
     n_cells = n_cells[idx]
   )
-  # Optional scale columns (scale_model = "log_sd") travel with the effect.
-  scale_cols <- intersect(c("scale", "scale_centre"), names(model$effects))
-  eff <- model$effects[, c(.bn_effect_cols, scale_cols)]
+  eff <- model$effects[, .bn_effect_cols]
   actions <- dplyr::left_join(
     actions,
     eff,
@@ -265,13 +252,6 @@ bn_integrate <- function(
     unbridged ~ "Batch shared no reference with the anchor at fit time (unbridged = \"abstain\"); original values kept.",
     .default = "Batch is in the model but has no effect for this population; original values kept. Refit to change this."
   )
-  has_scale <- length(scale_cols) == 2
-  scale <- if (has_scale) {
-    ifelse(actions$action == "apply", actions$scale, NA_real_)
-  } else {
-    NULL
-  }
-  centre <- if (has_scale) actions$scale_centre else NULL
   actions <- actions[, c(
     "batch",
     "population",
@@ -297,18 +277,11 @@ bn_integrate <- function(
     sep = "\r"
   )
   shift <- ifelse(actions$action == "apply", actions$estimate, NA_real_)
-  # Scale: deviations from the shifted centre are multiplied by `scale`; NA keeps the shift.
   for (m in markers) {
     i <- match(paste(cells$batch, cells$population, m, sep = "\r"), act_key)
     s <- shift[i]
     ok <- !is.na(s)
     out[ok, m] <- xm[ok, m] - s[ok]
-    if (has_scale) {
-      sc <- scale[i]
-      cc <- centre[i]
-      ok_sc <- ok & !is.na(sc) & !is.na(cc)
-      out[ok_sc, m] <- cc[ok_sc] + sc[ok_sc] * (out[ok_sc, m] - cc[ok_sc])
-    }
   }
   list(xm = out, actions = actions)
 }

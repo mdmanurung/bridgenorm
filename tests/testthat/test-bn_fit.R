@@ -1,237 +1,293 @@
-# bn_fit(): required settings, lme4 oracle, limiting cases, scale term, unbridged batches.
+# bn_fit(): two-pass node correction with per-node quantile maps (tusoskill c016).
 
-test_that("bn_fit names every missing required argument", {
-  s <- bn_sim()
-  expect_error(
-    bn_fit(s$x, s$meta, population = rep("T", nrow(s$x)), markers = "m1"),
-    "transform.*anchor.*hierarchy.*min_cells.*unbridged.*variance_floor.*pool"
+# Toy data: anchor b1 and batch b2, two reference donors per batch plus one study sample in b2.
+# Two clusters on the mapping marker CD3 (A near 1, B near 4). In b2, marker M is a known monotone
+# function of the anchor-scale value z: M = centre + 0.6 * (z - centre) + shift, a scale change the
+# node shift cannot remove. The anchor-scale value z of every cell is kept as the expected value.
+quantile_sim <- function(seed = 21, n = 400) {
+  set.seed(seed)
+  centre_m <- c(A = 2, B = 1)
+  centre_cd3 <- c(A = 1, B = 4)
+  shift <- c(A = 0.4, B = -0.3)
+  samples <- data.frame(
+    sample_id = c("D1_b1", "D2_b1", "D1_b2", "D2_b2", "S_b2"),
+    batch = c("b1", "b1", "b2", "b2", "b2"),
+    reference_id = c("D1", "D2", "D1", "D2", NA)
   )
-  expect_error(fit_sim(s, hierarchy = NULL), "hierarchy")
-  expect_error(fit_sim(s, variance_floor = 0), "variance_floor")
-  expect_error(fit_sim(s, pool = "some"), "pool")
-  expect_error(fit_sim(s, variance_prior = "flat"), "variance_prior")
-  expect_error(
-    fit_sim(s, scale_model = "sd"),
-    "scale_model = 'none' or 'log_sd'"
+  cells <- do.call(
+    rbind,
+    lapply(seq_len(nrow(samples)), function(i) {
+      do.call(
+        rbind,
+        lapply(c("A", "B"), function(k) {
+          z <- stats::rnorm(n, centre_m[[k]], 0.3)
+          m <- if (samples$batch[i] == "b2") {
+            centre_m[[k]] + 0.6 * (z - centre_m[[k]]) + shift[[k]]
+          } else {
+            z
+          }
+          data.frame(
+            sample_id = samples$sample_id[i],
+            CD3 = stats::rnorm(n, centre_cd3[[k]], 0.2),
+            M = m,
+            z = z
+          )
+        })
+      )
+    })
   )
-  expect_error(fit_sim(s, unbridged = "maybe"), "unbridged")
-})
-
-test_that("pooling over populations changes nothing with one population and marker", {
-  s <- bn_sim()
-  expect_equal(
-    fit_sim(s, pool = "population")$effects$estimate,
-    fit_sim(s)$effects$estimate,
-    tolerance = 1e-6
-  )
-})
-
-test_that("bn_fit effects match an lme4 REML fit on the same summaries", {
-  skip_if_not_installed("lme4")
-  s <- bn_sim()
-  eff <- fit_sim(s)$effects
-  d <- s$meta
-  d$value <- vapply(
-    d$sample_id,
-    function(id) mean(s$x$m1[s$x$sample_id == id]),
-    numeric(1)
-  )
-  d <- merge(d, s$hierarchy, by = "batch")
-  fit <- lme4::lmer(
-    value ~ 0 + donor + (1 | study) + (1 | batch),
-    data = d,
-    REML = TRUE,
-    control = lme4::lmerControl(
-      check.conv.grad = lme4::.makeCC("ignore", tol = 1e-3)
-    )
-  )
-  re <- lme4::ranef(fit)
-  beta <- function(b) re$study[substr(b, 1, 2), 1] + re$batch[b, 1]
-  want <- vapply(
-    s$hierarchy$batch,
-    function(b) beta(b) - beta("s1_r1"),
-    numeric(1)
-  )
-  got <- eff$estimate[match(s$hierarchy$batch, eff$batch)]
-  expect_equal(unname(got), unname(want), tolerance = 1e-3)
-  expect_equal(eff$estimate[eff$batch == "s1_r1"], 0)
-})
-
-test_that("the boundary prior keeps one-donor SEs off zero", {
-  s1 <- subset_sim(bn_sim(), bn_sim()$meta$donor == "D1")
-  eff <- fit_sim(s1, variance_prior = "boundary_avoiding")$effects
-  expect_true(all(eff$se_donor[eff$batch != "s1_r1"] > 1e-3))
-})
-
-test_that("known sampling variance sets the one-donor, one-aliquot SE", {
-  s <- bn_sim()
-  s <- subset_sim(s, s$meta$donor == "D1" & endsWith(s$meta$sample_id, "_1"))
-  eff <- fit_sim(s, residual_model = "known_plus_extra")$effects
-  se <- eff$se_donor[eff$batch != "s1_r1"]
-  expect_true(all(se > 0.5 * sqrt(2) * 0.4 / sqrt(40) / 5))
-  expect_true(all(is.finite(eff$estimate)))
-})
-
-test_that("bn_fit fits a design with one reference donor", {
-  s1 <- subset_sim(bn_sim(), bn_sim()$meta$donor == "D1")
-  eff <- fit_sim(s1)$effects
-  expect_equal(nrow(eff), 6)
-  expect_true(all(is.finite(eff$estimate)))
-})
-
-test_that("Satterthwaite df reduces to the residual df without shrinkage", {
-  # Batch variances far above the noise: df = 2 / Var(log sigma^2) = df_resid = 6 - 3 - 1 = 2.
-  d <- .bn_design(
-    data.frame(
-      value = c(1, 2.1, 3, 2, 3, 4.2),
-      reference_id = rep(c("D1", "D2", "D3"), 2),
-      batch = rep(c("a", "b"), each = 3),
-      aliquot = 1:6
-    ),
-    data.frame(batch = c("a", "b"), study = c("s", "s")),
-    "a",
-    "random",
-    "estimated"
-  )
-  est <- .bn_blup(d, c(1, 1, 1e-8), "a", cov_log = diag(c(0, 0, 2 / 2)))
-  expect_equal(est$df[est$batch == "b"], 2, tolerance = 1e-3)
-  expect_true(is.na(est$df[est$batch == "a"]))
-  eff <- fit_sim(bn_sim())$effects
-  expect_true(all(eff$df[eff$batch != "s1_r1"] > 0))
-  expect_true(all(is.na(eff$df[eff$batch == "s1_r1"])))
-})
-
-test_that("anchor_effect = 'fixed' pins the anchor at zero and reduces to paired shift", {
-  s <- bn_sim()
-  fixed <- fit_sim(s, anchor_effect = "fixed")$effects
-  expect_equal(fixed$estimate[fixed$batch == "s1_r1"], 0)
-  expect_equal(fixed$se_donor[fixed$batch == "s1_r1"], 0)
-  d <- .bn_design(
-    data.frame(
-      value = c(1, 2, 3, 2, 3, 4),
-      reference_id = rep(c("D1", "D2", "D3"), 2),
-      batch = rep(c("a", "b"), each = 3),
-      aliquot = 1:6
-    ),
-    data.frame(batch = c("a", "b"), study = c("s", "s")),
-    "a",
-    "fixed",
-    "estimated"
-  )
-  expect_equal(
-    .bn_blup(d, c(1e3, 1e3, 1e-3), "a")$estimate,
-    c(0, 1),
-    tolerance = 1e-3
-  )
-})
-
-test_that("unbridged = 'stop' refuses and 'abstain' leaves the unbridged batch raw", {
-  s <- bn_sim()
-  # Batch s3_r2 keeps its cells, but its samples are not references.
-  meta2 <- s$meta
-  no_ref <- meta2$batch == "s3_r2"
-  meta2$reference_id[no_ref] <- NA
-  meta2$aliquot[no_ref] <- NA
-  expect_error(fit_sim(s, meta = meta2), "share no reference.*s3_r2")
-  model <- fit_sim(
-    s,
-    meta = meta2,
-    unbridged = "abstain",
-    variance_prior = "boundary_avoiding",
-    residual_model = "known_plus_extra"
-  )
-  expect_setequal(model$effects$batch, setdiff(s$hierarchy$batch, "s3_r2"))
-  out <- bn_integrate(
-    model,
-    s$x,
-    meta2,
-    rep("T", nrow(s$x)),
-    TF,
-    unsupported = "abstain"
-  )
-  in_b <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)] == "s3_r2"
-  expect_equal(out$x$m1[in_b], s$x$m1[in_b])
-  ab <- out$actions[out$actions$batch == "s3_r2", ]
-  expect_true(all(ab$action == "abstain"))
-  expect_true(all(ab$reason_code == "unbridged_at_fit"))
-  expect_false(isTRUE(all.equal(out$x$m1[!in_b], s$x$m1[!in_b])))
-})
-
-test_that("a batch whose references are not in the anchor batch gets no effect under abstain", {
-  s <- bn_sim()
-  meta2 <- s$meta
-  # s3_r2 keeps references, but under ids the anchor batch never measured.
-  meta2$reference_id[meta2$batch == "s3_r2"] <- paste0(
-    "X",
-    meta2$reference_id[meta2$batch == "s3_r2"]
-  )
-  model <- fit_sim(s, meta = meta2, unbridged = "abstain")
-  expect_false("s3_r2" %in% model$effects$batch)
-  expect_false(model$bridges$bridged[model$bridges$batch == "s3_r2"])
-})
-
-# Scale term on log SD (plan F12) -----------------------------------------------------------------
-scale_sim <- function(spread) {
-  s <- bn_sim()
-  mu <- s$meta$mu[match(s$x$sample_id, s$meta$sample_id)]
-  b <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)]
-  f <- ifelse(b == "s2_r1", spread, 1)
-  s$x$m1 <- mu + f * (s$x$m1 - mu)
-  s
+  list(x = cells, samples = samples)
 }
 
-test_that("log_sd scale is about 1 without a spread effect and recovers a 1.5x spread", {
-  none <- fit_sim(
-    scale_sim(1),
-    residual_model = "known_plus_extra",
-    scale_model = "log_sd"
-  )$effects
-  expect_true(all(abs(log(none$scale)) < 0.1))
-  sp <- fit_sim(
-    scale_sim(1.5),
-    residual_model = "known_plus_extra",
-    scale_model = "log_sd"
-  )$effects
-  e <- sp[sp$batch == "s2_r1", ]
-  expect_lt(abs(-log(e$scale) - log(1.5)), 3 * e$scale_se)
-  expect_equal(sp$scale[sp$batch == "s1_r1"], 1)
-})
+fit_quantile_sim <- function(s, ...) {
+  args <- utils::modifyList(
+    list(
+      x = s$x[, c("sample_id", "CD3", "M")],
+      samples = s$samples,
+      population = rep("T", nrow(s$x)),
+      markers = c("CD3", "M"),
+      transform = list(name = "asinh", cofactor = 5),
+      anchor = "b1",
+      min_cells = 20,
+      unbridged = "stop",
+      method = "paired",
+      eb_settings = NULL,
+      grid = c(2, 1),
+      mapping_markers = "CD3",
+      train_cells = 200,
+      rlen = 50,
+      seed = 473,
+      assignment = "nearest",
+      fallback = "global",
+      quantile_probs = seq(0.025, 0.975, length.out = 21),
+      tail = "shift",
+      shrink_k = 0
+    ),
+    list(...)
+  )
+  do.call(bn_fit, args)
+}
 
-test_that("log_sd correction evens the spread, and scale_model = 'none' is the plain shift", {
-  s <- scale_sim(1.5)
-  fit <- fit_sim(s, residual_model = "known_plus_extra", scale_model = "log_sd")
-  out <- bn_integrate(
-    fit,
-    s$x,
-    s$meta,
+integrate_sim <- function(model, s) {
+  bn_apply(
+    model,
+    s$x[, c("sample_id", "CD3", "M")],
+    s$samples,
     rep("T", nrow(s$x)),
-    TF,
+    transform = list(name = "asinh", cofactor = 5),
     unsupported = "abstain"
   )
-  b <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)]
-  within_sd <- function(bb) {
-    v <- out$x$m1[b == bb]
-    stats::sd(v - ave(v, s$x$sample_id[b == bb]))
+}
+
+test_that("node quantile maps recover a known monotone batch transform that node shifts cannot", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  model <- fit_quantile_sim(s)
+  res <- integrate_sim(model, s)
+  study <- s$x$sample_id == "S_b2"
+  # Expected value: each study cell's anchor-scale value z, known from the simulation.
+  err_quantile <- mean(abs(res$x$M[study] - s$x$z[study]))
+  shift_only <- fit_quantile_sim(s)$pass1
+  err_shift <- mean(abs(integrate_sim(shift_only, s)$x$M[study] - s$x$z[study]))
+  expect_lt(err_quantile, 0.03)
+  expect_lt(err_quantile, err_shift / 3)
+})
+
+test_that("a value beyond the outer batch quantile moves by the outer quantile difference", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  model <- fit_quantile_sim(s)
+  # One study cell placed far above every b2 reference value in cluster A.
+  s$x$M[which(s$x$sample_id == "S_b2")[1]] <- 4
+  res <- integrate_sim(model, s)
+  pass1 <- integrate_sim(model$pass1, s)
+  i <- which(s$x$sample_id == "S_b2")[1]
+  q <- model$quantiles
+  qb <- q[[paste("b2", res$nodes[i], sep = "\r")]]
+  qa <- q[[paste("b1", res$nodes[i], sep = "\r")]]
+  expect_equal(
+    res$x$M[i] - pass1$x$M[i],
+    unname(qa[nrow(qa), "M"] - qb[nrow(qb), "M"]),
+    tolerance = 1e-12
+  )
+})
+
+test_that("a (batch, node) below min_cells pooled reference cells keeps the pass-2 shift and says so", {
+  skip_if_not_installed("kohonen")
+  # b3 references: 2 wells x 30 cells per node = 60 pooled; b2: 2 x 150 = 300. min_cells 70 sits between.
+  s <- nodes_sim(small_b3 = TRUE)
+  args <- list(
+    x = s$x[, c("sample_id", "CD3", "M")],
+    samples = s$samples,
+    population = rep("T", nrow(s$x)),
+    markers = c("CD3", "M"),
+    transform = list(name = "asinh", cofactor = 5),
+    anchor = "b1",
+    min_cells = 70,
+    unbridged = "abstain",
+    method = "paired",
+    eb_settings = NULL,
+    grid = c(2, 1),
+    mapping_markers = "CD3",
+    train_cells = 200,
+    rlen = 50,
+    seed = 473,
+    assignment = "nearest",
+    fallback = "global",
+    quantile_probs = seq(0.025, 0.975, length.out = 21),
+    tail = "shift",
+    shrink_k = 0
+  )
+  model <- do.call(bn_fit, args)
+  res <- bn_apply(
+    model,
+    s$x[, c("sample_id", "CD3", "M")],
+    s$samples,
+    rep("T", nrow(s$x)),
+    transform = list(name = "asinh", cofactor = 5),
+    unsupported = "abstain"
+  )
+  p2 <- res$actions[res$actions$pass == 2, ]
+  expect_true(all(p2$reason_code[p2$batch == "b2"] == "node_quantile"))
+  expect_false(any(p2$reason_code[p2$batch == "b3"] == "node_quantile"))
+  expect_false(any(grepl("^b3\r", names(model$quantiles))))
+})
+
+test_that("save and load keep the digest, and a changed quantile table fails", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  model <- fit_quantile_sim(s)
+  path <- tempfile(fileext = ".rds")
+  bn_save(model, path)
+  expect_identical(bn_load(path), model)
+  bad <- model
+  bad$quantiles[[1]][1, 1] <- bad$quantiles[[1]][1, 1] + 1
+  saveRDS(bad, path)
+  expect_error(bn_load(path), "Digest mismatch")
+})
+
+test_that("data-specific settings are required and invalid settings are refused", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  # modifyList() drops an element set to NULL, so these calls omit the argument.
+  for (arg in c("anchor", "grid", "mapping_markers", "seed", "transform")) {
+    expect_error(do.call(fit_quantile_sim, c(list(s), stats::setNames(list(NULL), arg))), arg)
   }
-  expect_lt(abs(within_sd("s2_r1") / within_sd("s1_r1") - 1), 0.15)
-  plain <- fit_sim(s, residual_model = "known_plus_extra", scale_model = "none")
-  expect_false("scale" %in% names(plain$effects))
-  expect_equal(plain$effects$estimate, fit$effects$estimate)
+  expect_error(fit_quantile_sim(s, tail = "linear"), "tail")
+  expect_error(fit_quantile_sim(s, shrink_k = -1), "shrink_k")
+  expect_error(fit_quantile_sim(s, quantile_probs = c(0.5, 0.2)), "quantile_probs")
+  expect_error(fit_quantile_sim(s, eb_settings = list()), "eb_settings")
 })
 
-# Review fixes for 0.5.1 (plans/2026-11-21_heb-0.5.1-fixes.md) -----------------
-
-test_that("n_aliquots counts aliquots per donor, not shared labels", {
-  s <- bn_sim()
-  # Label aliquots "1" and "2" within each donor and batch: 3 donors x 2 = 6 aliquots per batch.
-  s$meta$aliquot <- sub(".*_", "", s$meta$sample_id)
-  eff <- fit_sim(s)$effects
-  expect_true(all(eff$n_aliquots == 6))
-  expect_true(all(eff$n_aliquots_anchor == 6))
+test_that("the defaults are the benchmarked settings", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  explicit <- fit_quantile_sim(s, min_cells = 50, unbridged = "abstain", train_cells = 500, rlen = 100, shrink_k = 300)
+  defaults <- bn_fit(
+    x = s$x[, c("sample_id", "CD3", "M")],
+    samples = s$samples,
+    population = rep("T", nrow(s$x)),
+    markers = c("CD3", "M"),
+    transform = list(name = "asinh", cofactor = 5),
+    anchor = "b1",
+    grid = c(2, 1),
+    mapping_markers = "CD3",
+    seed = 473
+  )
+  expect_identical(defaults$quantiles, explicit$quantiles)
+  expect_identical(defaults$settings, explicit$settings)
+  expect_identical(defaults$settings$quantile_probs, seq(0.025, 0.975, length.out = 21))
 })
 
-test_that("a missing study label stops with a clear message", {
-  s <- bn_sim()
-  s$hierarchy$study[2] <- NA
-  expect_error(fit_sim(s), "study")
+# Expected tables from first principles: pass-1-corrected reference cells, their pass-2 nodes,
+# stats::quantile() per batch and per (batch, node), the shrinkage formula, then each column sorted
+# (rearrangement, heb 0.7.1).
+expect_shrunk_tables <- function(s, raw, shrunk, k) {
+  probs <- seq(0.025, 0.975, length.out = 21)
+  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
+  integ <- function(m, cells) {
+    bn_apply(m, cells, s$samples, rep("T", nrow(cells)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+  }
+  x1 <- integ(raw$pass1, ref)$x
+  nodes <- integ(raw$pass2, x1)$nodes
+  batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
+  q_of <- function(i) sapply(c("CD3", "M"), function(m) stats::quantile(x1[[m]][i], probs, names = FALSE, type = 7))
+  glob_off <- q_of(batch == "b2") - q_of(batch == "b1")
+  for (node in unique(nodes)) {
+    g <- paste("b2", node, sep = "\r")
+    ga <- paste("b1", node, sep = "\r")
+    skip_if(is.null(raw$quantiles[[g]]) || is.null(raw$quantiles[[ga]]))
+    n <- sum(batch == "b2" & nodes == node)
+    w <- n / (n + k)
+    expected <- q_of(batch == "b1" & nodes == node) +
+      w * (q_of(batch == "b2" & nodes == node) - q_of(batch == "b1" & nodes == node)) +
+      (1 - w) * glob_off
+    expect_equal(unname(shrunk$quantiles[[g]]), unname(apply(expected, 2, sort)), tolerance = 1e-12)
+    expect_identical(shrunk$quantiles[[ga]], raw$quantiles[[ga]])
+  }
+}
+
+test_that("shrink_k pulls each node offset curve toward the batch-wide curve by n / (n + shrink_k), then sorts", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  raw <- fit_quantile_sim(s, shrink_k = 0)
+  # shrink_k 3000 makes some shrunk columns of this fixture non-monotone before sorting (min step -0.017).
+  for (k in c(300, 3000)) {
+    shrunk <- fit_quantile_sim(s, shrink_k = k)
+    expect_shrunk_tables(s, raw, shrunk, k)
+    steps <- unlist(lapply(shrunk$quantiles, function(q) apply(q, 2, function(v) min(diff(v)))))
+    expect_true(all(steps >= 0))
+    expect_identical(shrunk$settings$shrink_k, k)
+  }
+})
+
+test_that("shrink_k = 0 leaves every quantile table as fitted", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  model <- fit_quantile_sim(s, shrink_k = 0)
+  probs <- seq(0.025, 0.975, length.out = 21)
+  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
+  x1 <- bn_apply(model$pass1, ref, s$samples, rep("T", nrow(ref)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$x
+  nodes <- bn_apply(model$pass2, x1, s$samples, rep("T", nrow(x1)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$nodes
+  batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
+  g <- names(model$quantiles)[[1]]
+  i <- paste(batch, nodes, sep = "\r") == g
+  expect_equal(
+    unname(model$quantiles[[g]][, "M"]),
+    stats::quantile(x1$M[i], probs, names = FALSE, type = 7),
+    tolerance = 1e-12
+  )
+})
+
+test_that("only batches with exactly the anchor's reference donors get quantile maps (RV2)", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  # b3: unbridged (donor D3 only). b4: partly bridged (D1 shared, D3 not). Cells copied from b2.
+  copy_sample <- function(from, to, batch, ref) {
+    list(
+      x = transform(s$x[s$x$sample_id == from, ], sample_id = to),
+      samples = data.frame(sample_id = to, batch = batch, reference_id = ref)
+    )
+  }
+  extra <- list(
+    copy_sample("D2_b2", "D3_b3", "b3", "D3"),
+    copy_sample("S_b2", "S_b3", "b3", NA),
+    copy_sample("D1_b2", "D1_b4", "b4", "D1"),
+    copy_sample("D2_b2", "D3_b4", "b4", "D3"),
+    copy_sample("S_b2", "S_b4", "b4", NA)
+  )
+  s$x <- rbind(s$x, do.call(rbind, lapply(extra, `[[`, "x")))
+  s$samples <- rbind(s$samples, do.call(rbind, lapply(extra, `[[`, "samples")))
+  model <- fit_quantile_sim(s, unbridged = "abstain", shrink_k = 300)
+  expect_false(any(grepl("^b[34]\r", names(model$quantiles))))
+  expect_true(any(grepl("^b2\r", names(model$quantiles))))
+  res <- integrate_sim(model, s)
+  # Unbridged b3 stays raw, as the README says.
+  s3 <- s$x$sample_id == "S_b3"
+  expect_equal(res$x$M[s3], s$x$M[s3], tolerance = 1e-12)
+  # Partly bridged b4 takes pass 1 then the pass-2 node shift, with no quantile map.
+  r1 <- integrate_sim(model$pass1, s)
+  r2 <- bn_apply(model$pass2, r1$x, s$samples, rep("T", nrow(s$x)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+  s4 <- s$x$sample_id == "S_b4"
+  expect_equal(res$x$M[s4], r2$x$M[s4], tolerance = 1e-12)
 })

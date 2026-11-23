@@ -44,7 +44,7 @@ test_that("a batch sharing no reference with the anchor is abstained or stops", 
 test_that("integrating a paired model subtracts its effects", {
   s <- bn_sim()
   m <- paired_sim_fit(s)
-  res <- bn_integrate(
+  res <- bn_apply(
     m,
     s$x,
     s$meta,

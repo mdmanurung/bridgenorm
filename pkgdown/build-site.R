@@ -9,6 +9,7 @@ PRIVATE <- c("HANDOFF") # root .md files pkgdown renders although .Rbuildignore 
 
 # Build ------------------------------------------------------------------------
 
+pkgdown::clean_site(force = TRUE) # drop pages of functions that no longer exist
 pkgdown::build_site(preview = FALSE, new_process = TRUE)
 
 # Drop private pages -----------------------------------------------------------

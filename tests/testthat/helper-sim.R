@@ -42,7 +42,7 @@ bn_sim <- function(seed = 5) {
   )
 }
 
-# bn_fit() on bn_sim() with plain settings; any setting can be overridden.
+# bn_fit_paired() on bn_sim(); any setting can be overridden ('hierarchy' is ignored).
 fit_sim <- function(s, x = s$x, meta = s$meta, ...) {
   args <- utils::modifyList(
     list(
@@ -52,26 +52,13 @@ fit_sim <- function(s, x = s$x, meta = s$meta, ...) {
       markers = "m1",
       transform = list(name = "asinh", cofactor = 5),
       anchor = "s1_r1",
-      hierarchy = s$hierarchy,
       min_cells = 10,
-      unbridged = "stop",
-      variance_floor = 1e-8,
-      pool = "none",
-      anchor_effect = "random",
-      variance_prior = "none",
-      residual_model = "estimated",
-      scale_model = "none",
-      moderation = "none",
-      moderation_centre = "fitted",
-      moderation_variance = "pev",
-      batch_shrinkage = "blup",
-      batch_shrinkage_centre = "study",
-      batch_shrinkage_group = "study",
-      batch_shrinkage_tau2 = "profile"
+      unbridged = "stop"
     ),
     list(...)
   )
-  do.call(bn_fit, args)
+  args$hierarchy <- NULL
+  do.call(bn_fit_paired, args)
 }
 
 # Keep only the samples where `keep` is TRUE.
@@ -81,87 +68,8 @@ subset_sim <- function(s, keep) {
   s
 }
 
-# 3 donors, 6 batches (3 studies x 2 runs), populations P and Q, 2 aliquots each.
-# `few` = c(batch, population) cuts that cell group to 3 cells to test borrowing.
-hebs_sim <- function(
-  seed = 11,
-  n_cells = 40,
-  few = NULL,
-  drop_anchor_pop = NULL
-) {
-  set.seed(seed)
-  batches <- paste0("s", rep(1:3, each = 2), "_r", rep(1:2, 3))
-  study_eff <- c(s1 = 0, s2 = 0.6, s3 = -0.4)
-  run_eff <- stats::setNames(stats::rnorm(6, 0, 0.3), batches)
-  dev_eff <- matrix(
-    stats::rnorm(12, 0, 0.2),
-    6,
-    2,
-    dimnames = list(batches, c("P", "Q"))
-  )
-  donor_eff <- outer(c(D1 = 0, D2 = 1, D3 = -1), c(P = 0, Q = 2), `+`)
-  meta <- list()
-  cells <- list()
-  for (b in batches) {
-    for (d in c("D1", "D2", "D3")) {
-      for (a in 1:2) {
-        for (k in c("P", "Q")) {
-          sid <- paste(d, b, a, sep = "_")
-          n <- if (!is.null(few) && b == few[[1]] && k == few[[2]]) {
-            3
-          } else {
-            n_cells
-          }
-          if (
-            !is.null(drop_anchor_pop) && b == "s1_r1" && k == drop_anchor_pop
-          ) {
-            n <- 3
-          }
-          mu <- donor_eff[d, k] +
-            study_eff[[substr(b, 1, 2)]] +
-            run_eff[[b]] +
-            dev_eff[b, k]
-          cells[[length(cells) + 1]] <- data.frame(
-            sample_id = sid,
-            pop = k,
-            m1 = stats::rnorm(n, mu, 0.4)
-          )
-          if (k == "P") {
-            meta[[length(meta) + 1]] <- data.frame(
-              sample_id = sid,
-              batch = b,
-              donor = d,
-              aliquot = sid,
-              reference_id = d
-            )
-          }
-        }
-      }
-    }
-  }
-  meta <- do.call(rbind, meta)
-  cells <- do.call(rbind, cells)
-  list(
-    x = tibble::tibble(sample_id = cells$sample_id, m1 = cells$m1),
-    pop = cells$pop,
-    meta = meta,
-    hierarchy = data.frame(batch = batches, study = substr(batches, 1, 2))
-  )
-}
 
-fit_shared_sim <- function(s) {
-  bn_fit_shared(
-    s$x,
-    s$meta,
-    population = s$pop,
-    markers = "m1",
-    transform = list(name = "asinh", cofactor = 5),
-    anchor = "s1_r1",
-    hierarchy = s$hierarchy,
-    min_cells = 10,
-    variance_floor = 1e-8
-  )
-}
+
 
 TF <- list(name = "asinh", cofactor = 5)
 

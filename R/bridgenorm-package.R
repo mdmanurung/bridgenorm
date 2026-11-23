@@ -1,17 +1,15 @@
 #' bridgenorm: cytometry batch correction from bridge samples
 #'
-#' Fit the main two-pass node and quantile model with
-#' \code{\link{bn_fit_node_quantile}}, or a node-shift model with
-#' \code{\link{bn_fit_nodes}}. Baselines: \code{\link{bn_fit_paired}} (paired
-#' shift), \code{\link{bn_fit}} (mixed model per population and marker) and
-#' \code{\link{bn_fit_shared}} (batch effect shared across populations).
-#' Apply any model with \code{\link{bn_integrate}}; store it with
-#' \code{\link{bn_save}} and \code{\link{bn_load}}. Check the design with
-#' \code{\link{bn_bridges}}, and report bridge-sample noise per batch with
-#' \code{\link{bn_reference_noise}} before choosing the anchor.
+#' Fit the two-pass node and quantile model with \code{\link{bn_fit}}, or the
+#' paired-shift baseline with \code{\link{bn_fit_paired}}. Correct data with
+#' \code{\link{bn_apply}}; store a model with \code{\link{bn_save}} and
+#' \code{\link{bn_load}}. Check the design with \code{\link{bn_bridges}}, and
+#' report bridge-sample noise per batch with \code{\link{bn_reference_noise}}
+#' before choosing the anchor.
 #'
-#' Every setting that can change an estimate is a required argument with no
-#' default.
+#' Settings that depend on the data (anchor, SOM grid, mapping markers, seed,
+#' transform) have no default. The other settings default to the values
+#' benchmarked on the data set A and data set B data.
 #'
 #' @keywords internal
 #' @importFrom dplyr .data

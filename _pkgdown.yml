@@ -8,20 +8,14 @@ navbar:
     right: [search]
 
 reference:
-  - title: Main method
-    desc: Two-pass node correction with per-node quantile maps.
+  - title: Fit
+    desc: The main two-pass node and quantile model, and the paired-shift baseline.
     contents:
-      - bn_fit_node_quantile
-      - bn_fit_nodes
-  - title: Baselines
-    desc: Paired shift and mixed-model corrections.
-    contents:
-      - bn_fit_paired
       - bn_fit
-      - bn_fit_shared
+      - bn_fit_paired
   - title: Apply and store
     contents:
-      - bn_integrate
+      - bn_apply
       - bn_save
   - title: Design checks
     contents:

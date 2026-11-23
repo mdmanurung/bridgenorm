@@ -11,7 +11,7 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 3.2)
 ```
 
-This article corrects a small simulated data set with `bn_fit_node_quantile()`. Because the data are simulated, every cell's value without the batch effect is known, so the correction can be checked against the truth.
+This article corrects a small simulated data set with `bn_fit()`. Because the data are simulated, every cell's value without the batch effect is known, so the correction can be checked against the truth.
 
 ```{r library}
 library(bridgenorm)
@@ -61,47 +61,31 @@ bn_bridges(samples, anchor = "b1")
 
 ## Fit
 
-The model is fitted on bridge cells only. Every argument that changes an estimate must be given; the values here suit this toy data set and are not recommendations.
+The model is fitted on bridge cells only. The anchor, the SOM grid, the mapping markers, the seed and the transform depend on the data and must be given. The other settings default to the values benchmarked on two spectral cytometry data sets; here the SOM training is shortened for the toy data.
 
 ```{r fit}
-model <- bn_fit_node_quantile(
+model <- bn_fit(
   x = cells[, c("sample_id", "CD3", "M")],
   samples = samples,
   population = rep("T", nrow(cells)),
   markers = c("CD3", "M"),
   transform = list(name = "asinh", cofactor = 5),
   anchor = "b1",
-  min_cells = 50,
-  unbridged = "abstain",
-  method = "paired",
-  eb_settings = NULL,
   grid = c(2, 1),
   mapping_markers = "CD3",
-  train_cells = 300,
-  rlen = 50,
   seed = 1,
-  assignment = "nearest",
-  fallback = "global",
-  quantile_probs = seq(0.025, 0.975, length.out = 21),
-  tail = "shift",
-  shrink_k = 300
+  train_cells = 300, # this toy data has 600 cells per sample
+  rlen = 50
 )
 model
 ```
 
 ## Correct
 
-`bn_integrate()` applies the frozen model to all cells, study samples included.
+`bn_apply()` applies the frozen model to all cells, study samples included.
 
 ```{r integrate}
-res <- bn_integrate(
-  model,
-  cells[, c("sample_id", "CD3", "M")],
-  samples,
-  rep("T", nrow(cells)),
-  transform = model$transform,
-  unsupported = "abstain"
-)
+res <- bn_apply(model, cells[, c("sample_id", "CD3", "M")], samples, rep("T", nrow(cells)))
 head(res$actions)
 ```
 

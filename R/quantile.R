@@ -1,4 +1,4 @@
-# Two-pass node correction with per-node quantile maps: bn_fit_node_quantile() and its integrate path.
+# Two-pass node correction with per-node quantile maps: bn_fit() and its apply path.
 #
 # Ported from the tusoskill run bn_nodes_20261121, candidate c016 (decisions T1-T3).
 
@@ -7,17 +7,17 @@
 #' Fit a two-pass node model with per-node quantile maps
 #'
 #' Batch effects can change the shape of a marker's distribution within a
-#' cell state, not only its location. \code{bn_fit_node_quantile()} runs a
-#' node shift (\code{\link{bn_fit_nodes}}), then refits a second map on the
+#' cell state, not only its location. \code{bn_fit()} runs a
+#' node shift (\code{\link{.bn_fit_nodes}}), then refits a second map on the
 #' shifted cells and, in each second-pass node, maps every batch's marker
 #' quantiles onto the anchor's.
 #'
 #' @details
 #' Steps, all on reference cells only:
 #' \enumerate{
-#'   \item Pass 1: \code{\link{bn_fit_nodes}} with the given settings; its
+#'   \item Pass 1: \code{\link{.bn_fit_nodes}} with the given settings; its
 #'     correction is applied to the reference cells.
-#'   \item Pass 2: \code{\link{bn_fit_nodes}} again, with the same settings,
+#'   \item Pass 2: \code{\link{.bn_fit_nodes}} again, with the same settings,
 #'     on the pass-1 cells. Its node shifts cover the cells pass 2 cannot
 #'     map by quantiles.
 #'   \item For each (batch, pass-2 node) with at least \code{min_cells}
@@ -53,43 +53,79 @@
 #' reference sample; a (batch, node) can therefore have quantiles without a
 #' node shift.
 #'
-#' @inheritParams bn_fit_nodes
+#' @param x A numeric matrix (cells by markers) or a data frame with one row
+#'   per cell, already transformed. A data frame needs a \code{sample_id}
+#'   column unless \code{sample_ids} is given.
+#' @param samples Data frame, one row per sample: \code{sample_id},
+#'   \code{batch}, \code{reference_id} (the bridge donor; \code{NA} for study
+#'   samples) and optionally \code{aliquot}.
+#' @param population Per-cell population labels, one per row of \code{x},
+#'   frozen before correction.
+#' @param markers Marker columns to correct.
+#' @param transform \code{list(name = "asinh", cofactor = <number>)}: the
+#'   scale \code{x} is on. It is recorded, never applied.
+#' @param anchor The batch that defines the target scale.
+#' @param grid SOM grid as \code{c(xdim, ydim)}.
+#' @param mapping_markers Markers that define cell state for the map; each
+#'   must be one of \code{markers}.
+#' @param seed Seed for the training-cell draw and the SOM.
+#' @param min_cells Minimum cells per reference aliquot summary and per
+#'   (batch, node) quantile table.
+#' @param unbridged \code{"abstain"} leaves a batch that shares no bridge
+#'   donor with the anchor raw and flags it; \code{"stop"} refuses the fit.
+#' @param method Node estimator; only \code{"paired"}.
+#' @param eb_settings Only \code{NULL}; kept for future estimators.
+#' @param train_cells Maximum training cells per reference sample for the SOM.
+#' @param rlen Number of SOM training passes (\code{kohonen::som}).
+#' @param assignment How cells are assigned to nodes; only \code{"nearest"}.
+#' @param fallback For a (batch, node, marker) without a node effect:
+#'   \code{"global"} takes the batch's global shift, \code{"abstain"} keeps
+#'   the raw value.
 #' @param quantile_probs Increasing probabilities in (0, 1), at least two,
 #'   at which batch and anchor quantiles are matched.
 #' @param tail Rule beyond the outer quantiles; only \code{"shift"}.
-#' @param shrink_k Non-negative number of cells: the pseudo-count of the
-#'   shrinkage toward the batch-wide offset curve. Larger values borrow more;
-#'   \code{0} turns shrinkage off. No default: it changes the estimates
-#'   (decision TR3k used 300).
+#' @param shrink_k Non-negative pseudo-count of cells for the shrinkage toward
+#'   the batch-wide offset curve. Larger values borrow more; \code{0} turns
+#'   shrinkage off.
+#' @param sample_ids Optional sample id per row; required for a matrix
+#'   \code{x}.
+#'
+#' @section Defaults:
+#' The defaults are the settings benchmarked on the data set A and data set B data
+#' (decisions T3, EX7, TR3k): \code{min_cells = 50}, \code{train_cells = 500},
+#' \code{rlen = 100}, 21 quantiles from 0.025 to 0.975, \code{shrink_k = 300}.
+#' They were tuned on data set A; check them on new data. \code{grid},
+#' \code{mapping_markers}, \code{anchor} and \code{seed} have no default.
+#'
 #' @return A \code{bn_node_quantile_model}: a list with
 #'   \code{schema_version}, \code{settings}, \code{markers},
 #'   \code{transform}, \code{anchor}, \code{pass1} and \code{pass2} (frozen
-#'   \code{bn_node_model}s), \code{quantiles} (one probabilities-by-markers
-#'   matrix per "batch\\rnode"), \code{software}, \code{created},
+#'   node models), \code{quantiles} (one probabilities-by-markers matrix per
+#'   "batch\\rnode"), \code{software}, \code{created},
 #'   \code{parent_digest} and \code{digest}.
-#' @seealso \code{\link{bn_fit_nodes}}, \code{\link{bn_integrate}}
+#' @seealso \code{\link{bn_apply}}, \code{\link{bn_fit_paired}}
 #' @export
-bn_fit_node_quantile <- function(
+bn_fit <- function(
   x,
   samples,
   population,
   markers,
   transform,
   anchor,
-  min_cells,
-  unbridged,
-  method,
-  eb_settings,
   grid,
   mapping_markers,
-  train_cells,
-  rlen,
   seed,
-  assignment,
-  fallback,
-  quantile_probs,
-  tail,
-  shrink_k,
+  min_cells = 50,
+  unbridged = "abstain",
+  method = "paired",
+  eb_settings = NULL,
+  train_cells = 500,
+  rlen = 100,
+  assignment = "nearest",
+  fallback = "global",
+  quantile_probs = seq(0.025, 0.975, length.out = 21),
+  tail = "shift",
+  shrink_k = 300,
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
@@ -99,22 +135,11 @@ bn_fit_node_quantile <- function(
     markers = missing(markers),
     transform = missing(transform),
     anchor = missing(anchor),
-    min_cells = missing(min_cells),
-    unbridged = missing(unbridged),
-    method = missing(method),
-    eb_settings = missing(eb_settings),
     grid = missing(grid),
     mapping_markers = missing(mapping_markers),
-    train_cells = missing(train_cells),
-    rlen = missing(rlen),
-    seed = missing(seed),
-    assignment = missing(assignment),
-    fallback = missing(fallback),
-    quantile_probs = missing(quantile_probs),
-    tail = missing(tail),
-    shrink_k = missing(shrink_k)
+    seed = missing(seed)
   ))
-  .bn_check_choice(tail, "tail", "shift", what = "bn_fit_node_quantile")
+  .bn_check_choice(tail, "tail", "shift", what = "bn_fit")
   if (
     !is.numeric(quantile_probs) ||
       length(quantile_probs) < 2 ||
@@ -136,14 +161,14 @@ bn_fit_node_quantile <- function(
     stop("'shrink_k' must be one finite number >= 0.", call. = FALSE)
   }
 
-  # Reference rows only, as bn_fit_nodes() uses.
+  # Reference rows only, as .bn_fit_nodes() uses.
   d <- .bn_cells(x, samples, population, markers, sample_ids)
   ref_rows <- which(d$cells$is_reference)
   x_ref <- x[ref_rows, , drop = FALSE]
   ids_ref <- d$cells$sample_id[ref_rows]
   pop_ref <- population[ref_rows]
   fit_pass <- function(xp) {
-    bn_fit_nodes(
+    .bn_fit_nodes(
       x = xp,
       samples = samples,
       population = pop_ref,
@@ -165,7 +190,7 @@ bn_fit_node_quantile <- function(
     )
   }
   integrate_pass <- function(m, xp) {
-    bn_integrate(
+    bn_apply(
       m,
       xp,
       samples,
@@ -291,8 +316,8 @@ bn_fit_node_quantile <- function(
   invisible(model)
 }
 
-# bn_integrate() for a bn_node_quantile_model: pass 1, then per-node quantile maps or the pass-2 shift.
-.bn_integrate_node_quantile <- function(
+# bn_apply() for a bn_node_quantile_model: pass 1, then per-node quantile maps or the pass-2 shift.
+.bn_apply_node_quantile <- function(
   model,
   x,
   samples,
@@ -304,7 +329,7 @@ bn_fit_node_quantile <- function(
   .bn_validate_node_quantile(model)
   d <- .bn_cells(x, samples, population, model$markers, sample_ids)
   ids <- d$cells$sample_id
-  r1 <- bn_integrate(
+  r1 <- bn_apply(
     model$pass1,
     x,
     samples,
@@ -313,7 +338,7 @@ bn_fit_node_quantile <- function(
     "abstain",
     sample_ids = ids
   )
-  r2 <- bn_integrate(
+  r2 <- bn_apply(
     model$pass2,
     r1$x,
     samples,
@@ -360,7 +385,7 @@ bn_fit_node_quantile <- function(
   ] <- "Batch and anchor quantiles in this node; the quantile map was applied."
   actions <- rbind(a1, a2)
 
-  # Keep the pass models as bn_integrate() returned them: they carry effects of new batches.
+  # Keep the pass models as bn_apply() returned them: they carry effects of new batches.
   updated <- model
   updated$pass1 <- r1$model
   updated$pass2 <- r2$model

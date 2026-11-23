@@ -10,7 +10,7 @@ bn_reference_noise(
   population,
   markers,
   transform,
-  min_cells,
+  min_cells = 50,
   sample_ids = NULL
 )
 }
@@ -20,8 +20,8 @@ per cell, already transformed. A data frame needs a \code{sample_id}
 column unless \code{sample_ids} is given.}
 
 \item{samples}{Data frame, one row per sample: \code{sample_id},
-\code{batch}, \code{reference_id} (\code{NA} when not a reference) and
-optionally \code{aliquot}.}
+\code{batch}, \code{reference_id} (the bridge donor; \code{NA} for study
+samples) and optionally \code{aliquot}.}
 
 \item{population}{Per-cell population labels, one per row of \code{x},
 frozen before correction.}
@@ -29,9 +29,10 @@ frozen before correction.}
 \item{markers}{Marker columns to correct.}
 
 \item{transform}{\code{list(name = "asinh", cofactor = <number>)}: the
-scale \code{x} is on.}
+scale \code{x} is on. It is recorded, never applied.}
 
-\item{min_cells}{Minimum cells per reference aliquot summary.}
+\item{min_cells}{Minimum cells per reference aliquot summary and per
+(batch, node) quantile table.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}
@@ -59,7 +60,7 @@ Columns:
     batches; \code{NA} when none has.}
 }
 A donor mean is the equal-weight mean of its aliquot means, as in
-\code{\link{bn_fit}}.
+\code{\link{bn_fit_paired}}.
 }
 \seealso{
 \code{\link{bn_fit}}, \code{\link{bn_bridges}}

@@ -21,7 +21,7 @@
 #'     batches; \code{NA} when none has.}
 #' }
 #' A donor mean is the equal-weight mean of its aliquot means, as in
-#' \code{\link{bn_fit}}.
+#' \code{\link{bn_fit_paired}}.
 #'
 #' @inheritParams bn_fit
 #' @return A tibble with one row per batch, population and marker.
@@ -33,7 +33,7 @@ bn_reference_noise <- function(
   population,
   markers,
   transform,
-  min_cells,
+  min_cells = 50,
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
@@ -41,8 +41,7 @@ bn_reference_noise <- function(
     samples = missing(samples),
     population = missing(population),
     markers = missing(markers),
-    transform = missing(transform),
-    min_cells = missing(min_cells)
+    transform = missing(transform)
   ))
   .bn_check_transform(transform)
   .bn_check_min_cells(min_cells)

@@ -1,15 +1,14 @@
 Package: bridgenorm
 Title: Cytometry Batch Correction from Bridge Samples
-Version: 0.8.0
+Version: 0.9.0
 Authors@R:
     person("M. D.", "Manurung", email = "m.d.manurung@lumc.nl", role = c("aut", "cre"))
 Description: Estimates technical batch effects in cytometry data from bridge
     samples, reference material from the same donor measured in every batch.
-    The main method assigns cells to the nodes of a self-organising map, fits
-    a paired shift per batch and node, and then maps each batch's marker
-    quantiles onto those of an anchor batch within each node, shrinking small
-    nodes toward the batch-wide curve. Linear mixed models fitted by
-    restricted maximum likelihood and a paired-shift baseline are included.
+    Cells are assigned to the nodes of a self-organising map, a paired shift
+    is fitted per batch and node, and each batch's marker quantiles are then
+    mapped onto those of an anchor batch within each node, shrinking small
+    nodes toward the batch-wide curve. A paired-shift baseline is included.
     Study samples never enter a fit. Models are frozen with a digest and
     applied to new data without changing earlier corrections. Formerly 'heb'.
 License: MIT + file LICENSE
@@ -25,7 +24,6 @@ Imports:
     utils
 Suggests:
     kohonen,
-    lme4,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)

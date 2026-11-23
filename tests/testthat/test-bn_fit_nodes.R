@@ -1,4 +1,4 @@
-# bn_fit_nodes(): node-level shifts recover planted per-cluster batch effects; fallback, order, seed, save/load.
+# .bn_fit_nodes(): node-level shifts recover planted per-cluster batch effects; fallback, order, seed, save/load.
 
 fit_nodes_sim <- function(s, ...) {
   args <- utils::modifyList(
@@ -23,11 +23,11 @@ fit_nodes_sim <- function(s, ...) {
     ),
     list(...)
   )
-  do.call(bn_fit_nodes, args)
+  do.call(.bn_fit_nodes, args)
 }
 
 integrate_nodes_sim <- function(model, s) {
-  bn_integrate(
+  bn_apply(
     model,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -68,7 +68,7 @@ test_that("the global CD3+ model cannot recover cluster-specific shifts (control
     min_cells = 20,
     unbridged = "stop"
   )
-  res <- bn_integrate(
+  res <- bn_apply(
     global,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -80,38 +80,6 @@ test_that("the global CD3+ model cannot recover cluster-specific shifts (control
   b2 <- m[m$sample_id == "S_b2", ]
   # One shift of about +0.1 (mean of +0.5 and -0.3) leaves cluster A 0.4 high and B 0.4 low.
   expect_gt(max(abs(b2$x - ifelse(b2$cluster == "A", 2, 1))), 0.3)
-})
-
-test_that("eb node model recovers planted per-cluster shifts", {
-  skip_if_not_installed("kohonen")
-  s <- nodes_sim()
-  settings <- list(
-    hierarchy = data.frame(batch = c("b1", "b2", "b3"), study = "s1"),
-    variance_floor = 1e-8,
-    pool = "none",
-    anchor_effect = "fixed",
-    variance_prior = "boundary_avoiding",
-    residual_model = "known_plus_extra",
-    scale_model = "none",
-    moderation = "none",
-    moderation_centre = "fitted",
-    moderation_variance = "pev",
-    batch_shrinkage = "blup",
-    batch_shrinkage_centre = "study",
-    batch_shrinkage_group = "study",
-    batch_shrinkage_tau2 = "profile"
-  )
-  res <- integrate_nodes_sim(
-    fit_nodes_sim(s, method = "eb", eb_settings = settings),
-    s
-  )
-  m <- study_means(res, s)
-  expect_equal(
-    m$x,
-    ifelse(m$cluster == "A", 2, 1),
-    tolerance = 0.05,
-    ignore_attr = TRUE
-  )
 })
 
 test_that("a node without an effect falls back to the global shift or abstains", {
@@ -179,7 +147,7 @@ test_that("one seed gives the same map; the seed is required", {
     assignment = "nearest",
     fallback = "global"
   )
-  expect_error(do.call(bn_fit_nodes, args), "seed")
+  expect_error(do.call(.bn_fit_nodes, args), "seed")
 })
 
 test_that("a node model survives bn_save and bn_load", {
@@ -232,7 +200,7 @@ test_that("a node row reads 'apply' only when every cell in it got the global ef
   batch <- batch[keep]
   # min_cells 25: each b3 node has 20 cells per sample (15 P + 5 Q), so no node effect; global P has 30.
   model <- fit_nodes_sim(s, population = pop, min_cells = 25)
-  res <- bn_integrate(
+  res <- bn_apply(
     model,
     s$x[, c("sample_id", "CD3", "M")],
     s$samples,
@@ -253,7 +221,7 @@ test_that("a node row reads 'apply' only when every cell in it got the global ef
   )
   expect_equal(sum(raw[batch == "b3" & pop == "P"]), 0)
   expect_error(
-    bn_integrate(
+    bn_apply(
       model,
       s$x[, c("sample_id", "CD3", "M")],
       s$samples,
@@ -289,7 +257,7 @@ test_that("a node model keeps the effects of a batch it estimated at integrate t
   )
 })
 
-test_that("bn_fit_nodes() leaves the caller's random number stream alone", {
+test_that(".bn_fit_nodes() leaves the caller's random number stream alone", {
   skip_if_not_installed("kohonen")
   s <- nodes_sim()
   set.seed(1)

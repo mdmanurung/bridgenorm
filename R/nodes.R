@@ -1,4 +1,4 @@
-# Node-level correction: bn_fit_nodes() and its integrate path.
+# Node-level correction (internal): .bn_fit_nodes(), the pass-1 and pass-2 model of bn_fit(), and its apply path.
 #
 # Ported from experiments/data set A/27_som-grid.R (SOM grid sweep, decisions SG1-SG4, N1-N3).
 
@@ -6,10 +6,10 @@
 
 #' Fit a node-level batch-correction model
 #'
-#' Batch effects often differ between cell states. \code{bn_fit_nodes()}
+#' Batch effects often differ between cell states. \code{.bn_fit_nodes()}
 #' learns a self-organising map (SOM) on the reference cells and fits the
-#' chosen estimator (paired shift or \code{\link{bn_fit}}) separately in each
-#' map node, with the node as the population. \code{\link{bn_integrate}} then
+#' paired shift separately in each
+#' map node, with the node as the population. \code{\link{bn_apply}} then
 #' assigns every cell to its nearest node and subtracts that node's effect.
 #'
 #' @details
@@ -37,7 +37,7 @@
 #'
 #' The training cells are drawn by position within each reference sample, so
 #' for a given \code{seed} the map depends on the row order of \code{x}
-#' within a sample. \code{bn_fit_nodes()} restores the caller's random
+#' within a sample. \code{.bn_fit_nodes()} restores the caller's random
 #' number stream on exit.
 #'
 #' Every argument that changes an estimate is required, with no default; the
@@ -47,14 +47,8 @@
 #' Needs the \pkg{kohonen} package.
 #'
 #' @inheritParams bn_fit
-#' @param method \code{"paired"} (\code{\link{bn_fit_paired}}) or
-#'   \code{"eb"} (\code{\link{bn_fit}}).
-#' @param eb_settings For \code{method = "eb"}: a named list with
-#'   \code{hierarchy} and every model setting of \code{\link{bn_fit}}
-#'   (\code{variance_floor} to \code{batch_shrinkage_tau2}). \code{NULL} for
-#'   \code{"paired"}.
-#' @param unbridged \code{"stop"} or \code{"abstain"}, as in
-#'   \code{\link{bn_fit}}.
+#' @param method Only \code{"paired"} (\code{\link{bn_fit_paired}}).
+#' @param eb_settings Only \code{NULL}.
 #' @param grid SOM grid as \code{c(xdim, ydim)}.
 #' @param mapping_markers Markers that define cell state for the map; each
 #'   must be one of \code{markers}, so it is pre-shifted.
@@ -69,10 +63,8 @@
 #'   \code{labels}, \code{mapping_markers}), \code{global_paired},
 #'   \code{global} and \code{local} (frozen \code{bn_model}s),
 #'   \code{software}, \code{created} and \code{digest}.
-#' @seealso \code{\link{bn_fit}}, \code{\link{bn_fit_paired}},
-#'   \code{\link{bn_integrate}}
-#' @export
-bn_fit_nodes <- function(
+#' @noRd
+.bn_fit_nodes <- function(
   x,
   samples,
   population,
@@ -113,30 +105,24 @@ bn_fit_nodes <- function(
   ))
   if (!requireNamespace("kohonen", quietly = TRUE)) {
     stop(
-      "bn_fit_nodes() needs the 'kohonen' package: install.packages(\"kohonen\").",
+      ".bn_fit_nodes() needs the 'kohonen' package: install.packages(\"kohonen\").",
       call. = FALSE
     )
   }
   .bn_check_choice(
     method,
     "method",
-    c("paired", "eb"),
-    what = "bn_fit_nodes"
+    "paired",
+    what = ".bn_fit_nodes"
   )
-  .bn_check_choice(assignment, "assignment", "nearest", what = "bn_fit_nodes")
+  .bn_check_choice(assignment, "assignment", "nearest", what = ".bn_fit_nodes")
   .bn_check_choice(
     fallback,
     "fallback",
     c("global", "abstain"),
-    what = "bn_fit_nodes"
+    what = ".bn_fit_nodes"
   )
-  if (method == "eb" && !is.list(eb_settings)) {
-    stop(
-      "method = \"eb\" needs 'eb_settings', a list of bn_fit() settings.",
-      call. = FALSE
-    )
-  }
-  if (method == "paired" && !is.null(eb_settings)) {
+  if (!is.null(eb_settings)) {
     stop("method = \"paired\" takes eb_settings = NULL.", call. = FALSE)
   }
   if (
@@ -185,7 +171,7 @@ bn_fit_nodes <- function(
     )
   }
 
-  # Reference rows only: every fit and the map use them, as bn_fit() does.
+  # Reference rows only: every fit and the map use them.
   d <- .bn_cells(x, samples, population, markers, sample_ids)
   ref_rows <- which(d$cells$is_reference)
   x_ref <- x[ref_rows, , drop = FALSE]
@@ -203,18 +189,10 @@ bn_fit_nodes <- function(
       unbridged = unbridged_rule,
       sample_ids = ids_ref
     )
-    if (fit_method == "paired") {
-      do.call(bn_fit_paired, args)
-    } else {
-      do.call(bn_fit, c(args, eb_settings))
-    }
+    do.call(bn_fit_paired, args)
   }
   global_paired <- fit_one("paired", pop_ref, unbridged)
-  global <- if (method == "paired") {
-    global_paired
-  } else {
-    fit_one("eb", pop_ref, unbridged)
-  }
+  global <- global_paired
 
   # Map: trained on reference cells after the global paired shift.
   mapped_ref <- .bn_node_mapping_data(
@@ -312,7 +290,7 @@ bn_fit_nodes <- function(
 }
 
 # Mapping markers after the global paired shift; cells the global model abstains on stay raw.
-# Returns the mapped matrix (x) and the global paired model as bn_integrate() returned it (model).
+# Returns the mapped matrix (x) and the global paired model as bn_apply() returned it (model).
 .bn_node_mapping_data <- function(
   global_paired,
   x,
@@ -322,7 +300,7 @@ bn_fit_nodes <- function(
   transform,
   sample_ids
 ) {
-  res <- bn_integrate(
+  res <- bn_apply(
     global_paired,
     x,
     samples,
@@ -374,8 +352,8 @@ bn_fit_nodes <- function(
   invisible(model)
 }
 
-# bn_integrate() for a bn_node_model: nearest-node effects, with the global model as fallback.
-.bn_integrate_nodes <- function(
+# bn_apply() for a bn_node_model: nearest-node effects, with the global model as fallback.
+.bn_apply_nodes <- function(
   model,
   x,
   samples,
@@ -398,7 +376,7 @@ bn_fit_nodes <- function(
   )
   nodes <- model$map$labels[.bn_node_nearest(mapping$x, model$map)]
 
-  local <- bn_integrate(
+  local <- bn_apply(
     model$local,
     x,
     samples,
@@ -407,7 +385,7 @@ bn_fit_nodes <- function(
     "abstain",
     sample_ids = ids
   )
-  global <- bn_integrate(
+  global <- bn_apply(
     model$global,
     x,
     samples,
@@ -481,7 +459,7 @@ bn_fit_nodes <- function(
     )
   }
 
-  # Keep the component models as bn_integrate() returned them: they carry effects of new batches.
+  # Keep the component models as bn_apply() returned them: they carry effects of new batches.
   updated <- model
   updated$global_paired <- mapping$model
   updated$global <- if (model$method == "paired") {

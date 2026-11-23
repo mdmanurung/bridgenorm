@@ -5,9 +5,10 @@
 #' For each batch, population and marker, the effect is the mean over the
 #' references shared with the anchor batch of (reference summary in the batch
 #' minus the same reference's summary in the anchor). Reference summaries are
-#' equal-weight means of aliquot means, as in \code{\link{bn_fit}}. Nothing is
-#' shrunk. This is the estimator \code{\link{bn_integrate}} uses for batches
-#' unseen at fit time, exposed so that it can be fitted and compared directly.
+#' equal-weight means of aliquot means. Nothing is shrunk. This is the
+#' baseline every bridgenorm model must beat, the estimator \code{\link{bn_fit}}
+#' uses in each SOM node, and the one \code{\link{bn_apply}} uses for batches
+#' unseen at fit time.
 #'
 #' @details
 #' \code{se_donor} is the SD of the paired differences over references divided
@@ -16,13 +17,17 @@
 #' \code{support = "anchor"}.
 #'
 #' With \code{unbridged = "abstain"}, a batch that shares no reference with the
-#' anchor (after \code{min_cells}) gets no effect, so \code{\link{bn_integrate}} leaves its cells raw
+#' anchor (after \code{min_cells}) gets no effect, so \code{\link{bn_apply}} leaves its cells raw
 #' and flags them; \code{"stop"} refuses the fit.
 #'
 #' @inheritParams bn_fit
-#' @return A \code{bn_model} with \code{method = "paired_shift"}; see
-#'   \code{\link{bn_fit}}. Its \code{hierarchy} puts every batch in one study.
-#' @seealso \code{\link{bn_fit}}, \code{\link{bn_integrate}}
+#' @return A \code{bn_model}: a list with \code{method = "paired_shift"},
+#'   \code{settings}, \code{markers}, \code{transform}, \code{anchor},
+#'   \code{effects} (one row per batch, population and marker: estimate,
+#'   \code{se_donor}, \code{df}, donor and aliquot counts, \code{support}),
+#'   \code{targets} (anchor summaries), \code{bridges}, \code{excluded},
+#'   \code{known_batches} and \code{digest}.
+#' @seealso \code{\link{bn_fit}}, \code{\link{bn_apply}}
 #' @examples
 #' set.seed(1)
 #' batches <- c("b1", "b2", "b3")
@@ -39,7 +44,7 @@
 #' model <- bn_fit_paired(
 #'   x, samples, population = rep("T", nrow(x)), markers = "CD3",
 #'   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
-#'   min_cells = 20, unbridged = "abstain"
+#'   min_cells = 20
 #' )
 #' model$effects[, c("batch", "estimate", "se_donor")]
 #' @export
@@ -50,8 +55,8 @@ bn_fit_paired <- function(
   markers,
   transform,
   anchor,
-  min_cells,
-  unbridged,
+  min_cells = 50,
+  unbridged = "abstain",
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
@@ -60,9 +65,7 @@ bn_fit_paired <- function(
     population = missing(population),
     markers = missing(markers),
     transform = missing(transform),
-    anchor = missing(anchor),
-    min_cells = missing(min_cells),
-    unbridged = missing(unbridged)
+    anchor = missing(anchor)
   ))
   .bn_check_choice(unbridged, "unbridged", c("stop", "abstain"))
   samples <- .bn_check_samples(samples)

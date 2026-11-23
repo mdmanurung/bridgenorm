@@ -1,3 +1,15 @@
+# bridgenorm 0.9.0
+
+* The mixed-model fits are removed: `bn_fit()` (REML), `bn_fit_shared()`, moderation, batch shrinkage and the
+  `"eb"` node method. No benchmarked method used them. Experiments that need them stay on heb 0.7.x.
+* `bn_fit_node_quantile()` is now `bn_fit()`, the main method. `bn_integrate()` is now `bn_apply()`.
+  `bn_fit_nodes()` is internal; it is the pass-1 and pass-2 model of `bn_fit()`.
+* Settings that depend on the data stay required: `anchor`, `grid`, `mapping_markers`, `seed`, `transform`,
+  `markers` and `population`. The rest default to the benchmarked values: `min_cells = 50`,
+  `unbridged = "abstain"`, `train_cells = 500`, `rlen = 100`, 21 quantiles from 0.025 to 0.975, `tail = "shift"`,
+  `shrink_k = 300`. `bn_fit_paired()` and `bn_reference_noise()` default to `min_cells = 50`; `bn_apply()`
+  defaults to the model's transform and `unsupported = "abstain"`. Estimates are unchanged.
+
 # bridgenorm 0.8.0
 
 * The package is renamed from heb to bridgenorm. Exported functions, classes and schema strings change prefix

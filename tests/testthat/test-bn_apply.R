@@ -1,9 +1,9 @@
-# bn_integrate(), the frozen model and save/load.
+# bn_apply(), the frozen model and save/load.
 
 test_that("integrating again leaves earlier corrected values unchanged", {
   s <- bn_sim()
   model <- fit_sim(s)
-  old <- bn_integrate(
+  old <- bn_apply(
     model,
     s$x,
     s$meta,
@@ -11,7 +11,7 @@ test_that("integrating again leaves earlier corrected values unchanged", {
     TF,
     unsupported = "abstain"
   )
-  again <- bn_integrate(
+  again <- bn_apply(
     old$model,
     s$x,
     s$meta,
@@ -20,18 +20,6 @@ test_that("integrating again leaves earlier corrected values unchanged", {
     unsupported = "abstain"
   )
   expect_identical(old$x, again$x)
-  s2 <- hebs_sim()
-  m2 <- fit_shared_sim(s2)
-  o2 <- bn_integrate(m2, s2$x, s2$meta, s2$pop, TF, unsupported = "abstain")
-  a2 <- bn_integrate(
-    o2$model,
-    s2$x,
-    s2$meta,
-    s2$pop,
-    TF,
-    unsupported = "abstain"
-  )
-  expect_identical(o2$x, a2$x)
 })
 
 test_that("a new bridged batch gets a paired effect and old effects stay frozen", {
@@ -39,7 +27,7 @@ test_that("a new bridged batch gets a paired effect and old effects stay frozen"
   in_new <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)] == "s3_r2"
   s_old <- subset_sim(s, s$meta$batch != "s3_r2")
   model <- fit_sim(s_old, hierarchy = s$hierarchy)
-  res <- bn_integrate(
+  res <- bn_apply(
     model,
     s$x,
     s$meta,
@@ -80,7 +68,7 @@ test_that("integrate refuses a different transform and reports abstentions under
   s <- bn_sim()
   model <- fit_sim(s)
   expect_error(
-    bn_integrate(
+    bn_apply(
       model,
       s$x,
       s$meta,
@@ -91,7 +79,7 @@ test_that("integrate refuses a different transform and reports abstentions under
     "Transform mismatch"
   )
   expect_error(
-    bn_integrate(
+    bn_apply(
       model,
       s$x,
       s$meta,

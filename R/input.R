@@ -34,6 +34,14 @@
   value
 }
 
+# Stop unless target is "anchor" or "virtual".
+.bn_check_target <- function(target) {
+  if (!identical(target, "anchor") && !identical(target, "virtual")) {
+    stop("'target' must be \"anchor\" or \"virtual\".", call. = FALSE)
+  }
+  target
+}
+
 # Normalise and check list(name = "asinh", cofactor = <number>).
 .bn_check_transform <- function(transform) {
   if (

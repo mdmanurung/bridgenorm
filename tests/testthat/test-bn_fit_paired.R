@@ -1,6 +1,6 @@
 # bn_fit_paired(): effects against a hand computation, abstention and integration.
 
-paired_sim_fit <- function(s, meta = s$meta, unbridged = "stop") {
+paired_sim_fit <- function(s, meta = s$meta, unbridged = "stop", ...) {
   x <- s$x[s$x$sample_id %in% meta$sample_id, ]
   bn_fit_paired(
     x,
@@ -10,7 +10,8 @@ paired_sim_fit <- function(s, meta = s$meta, unbridged = "stop") {
     transform = list(name = "asinh", cofactor = 5),
     anchor = "s1_r1",
     min_cells = 10,
-    unbridged = unbridged
+    unbridged = unbridged,
+    ...
   )
 }
 
@@ -55,4 +56,22 @@ test_that("integrating a paired model subtracts its effects", {
   b <- s$meta$batch[match(s$x$sample_id, s$meta$sample_id)]
   shift <- m$effects$estimate[match(b, m$effects$batch)]
   expect_equal(res$x$m1, s$x$m1 - shift, tolerance = 1e-10)
+})
+
+test_that("target = \"virtual\" shifts every batch, the anchor too, to the mean over batches of donor summaries", {
+  s <- bn_sim()
+  m <- paired_sim_fit(s, target = "virtual")
+  # Hand computation: donor means per batch, each donor's mean over batches (equal weight), mean over donors.
+  am <- tapply(s$x$m1, s$x$sample_id, mean)
+  meta <- s$meta
+  meta$am <- am[meta$sample_id]
+  dm <- tapply(meta$am, list(meta$donor, meta$batch), mean)
+  want <- colMeans(dm - rowMeans(dm))
+  got <- m$effects[match(names(want), m$effects$batch), ]
+  expect_equal(got$estimate, unname(want), tolerance = 1e-12)
+  expect_true(abs(got$estimate[got$batch == "s1_r1"]) > 0.01)
+  expect_equal(unique(got$support), "paired_reference")
+  expect_identical(m$settings$target, "virtual")
+  expect_identical(paired_sim_fit(s)$settings$target, "anchor")
+  expect_error(paired_sim_fit(s, target = "mean"), "target")
 })

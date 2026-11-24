@@ -82,7 +82,8 @@
   seed,
   assignment,
   fallback,
-  sample_ids = NULL
+  sample_ids = NULL,
+  target = "anchor"
 ) {
   .bn_stop_missing(c(
     x = missing(x),
@@ -187,6 +188,7 @@
       anchor = anchor,
       min_cells = min_cells,
       unbridged = unbridged_rule,
+      target = target,
       sample_ids = ids_ref
     )
     do.call(bn_fit_paired, args)
@@ -262,6 +264,7 @@
         assignment = assignment,
         fallback = fallback,
         eb_settings = eb_settings,
+        target = target,
         # kohonen settings left at their defaults, recorded so the map can be rebuilt.
         som = list(
           kohonen = as.character(utils::packageVersion("kohonen")),

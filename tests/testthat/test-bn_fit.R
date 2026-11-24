@@ -171,18 +171,31 @@ test_that("data-specific settings are required and invalid settings are refused"
   s <- quantile_sim()
   # modifyList() drops an element set to NULL, so these calls omit the argument.
   for (arg in c("anchor", "grid", "mapping_markers", "seed", "transform")) {
-    expect_error(do.call(fit_quantile_sim, c(list(s), stats::setNames(list(NULL), arg))), arg)
+    expect_error(
+      do.call(fit_quantile_sim, c(list(s), stats::setNames(list(NULL), arg))),
+      arg
+    )
   }
   expect_error(fit_quantile_sim(s, tail = "linear"), "tail")
   expect_error(fit_quantile_sim(s, shrink_k = -1), "shrink_k")
-  expect_error(fit_quantile_sim(s, quantile_probs = c(0.5, 0.2)), "quantile_probs")
+  expect_error(
+    fit_quantile_sim(s, quantile_probs = c(0.5, 0.2)),
+    "quantile_probs"
+  )
   expect_error(fit_quantile_sim(s, eb_settings = list()), "eb_settings")
 })
 
 test_that("the defaults are the benchmarked settings", {
   skip_if_not_installed("kohonen")
   s <- quantile_sim()
-  explicit <- fit_quantile_sim(s, min_cells = 50, unbridged = "abstain", train_cells = 500, rlen = 100, shrink_k = 300)
+  explicit <- fit_quantile_sim(
+    s,
+    min_cells = 50,
+    unbridged = "abstain",
+    train_cells = 500,
+    rlen = 100,
+    shrink_k = 300
+  )
   defaults <- bn_fit(
     x = s$x[, c("sample_id", "CD3", "M")],
     samples = s$samples,
@@ -196,7 +209,10 @@ test_that("the defaults are the benchmarked settings", {
   )
   expect_identical(defaults$quantiles, explicit$quantiles)
   expect_identical(defaults$settings, explicit$settings)
-  expect_identical(defaults$settings$quantile_probs, seq(0.025, 0.975, length.out = 21))
+  expect_identical(
+    defaults$settings$quantile_probs,
+    seq(0.025, 0.975, length.out = 21)
+  )
 })
 
 # Expected tables from first principles: pass-1-corrected reference cells, their pass-2 nodes,
@@ -204,14 +220,28 @@ test_that("the defaults are the benchmarked settings", {
 # (rearrangement, heb 0.7.1).
 expect_shrunk_tables <- function(s, raw, shrunk, k) {
   probs <- seq(0.025, 0.975, length.out = 21)
-  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
+  ref <- s$x[
+    !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
+    c("sample_id", "CD3", "M")
+  ]
   integ <- function(m, cells) {
-    bn_apply(m, cells, s$samples, rep("T", nrow(cells)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+    bn_apply(
+      m,
+      cells,
+      s$samples,
+      rep("T", nrow(cells)),
+      transform = list(name = "asinh", cofactor = 5),
+      unsupported = "abstain"
+    )
   }
   x1 <- integ(raw$pass1, ref)$x
   nodes <- integ(raw$pass2, x1)$nodes
   batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
-  q_of <- function(i) sapply(c("CD3", "M"), function(m) stats::quantile(x1[[m]][i], probs, names = FALSE, type = 7))
+  q_of <- function(i) {
+    sapply(c("CD3", "M"), function(m) {
+      stats::quantile(x1[[m]][i], probs, names = FALSE, type = 7)
+    })
+  }
   glob_off <- q_of(batch == "b2") - q_of(batch == "b1")
   for (node in unique(nodes)) {
     g <- paste("b2", node, sep = "\r")
@@ -223,7 +253,11 @@ expect_shrunk_tables <- function(s, raw, shrunk, k) {
     expected <- qa +
       sweep(q_of(batch == "b2" & nodes == node) - qa, 2, w, "*") +
       sweep(glob_off, 2, 1 - w, "*")
-    expect_equal(unname(shrunk$quantiles[[g]]), unname(apply(expected, 2, sort)), tolerance = 1e-12)
+    expect_equal(
+      unname(shrunk$quantiles[[g]]),
+      unname(apply(expected, 2, sort)),
+      tolerance = 1e-12
+    )
     expect_identical(shrunk$quantiles[[ga]], raw$quantiles[[ga]])
   }
 }
@@ -236,7 +270,9 @@ test_that("shrink_k pulls each node offset curve toward the batch-wide curve by 
   for (k in c(300, 3000)) {
     shrunk <- fit_quantile_sim(s, shrink_k = k)
     expect_shrunk_tables(s, raw, shrunk, k)
-    steps <- unlist(lapply(shrunk$quantiles, function(q) apply(q, 2, function(v) min(diff(v)))))
+    steps <- unlist(lapply(shrunk$quantiles, function(q) {
+      apply(q, 2, function(v) min(diff(v)))
+    }))
     expect_true(all(steps >= 0))
     expect_identical(shrunk$settings$shrink_k, k)
   }
@@ -247,9 +283,26 @@ test_that("shrink_k = 0 leaves every quantile table as fitted", {
   s <- quantile_sim()
   model <- fit_quantile_sim(s, shrink_k = 0)
   probs <- seq(0.025, 0.975, length.out = 21)
-  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
-  x1 <- bn_apply(model$pass1, ref, s$samples, rep("T", nrow(ref)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$x
-  nodes <- bn_apply(model$pass2, x1, s$samples, rep("T", nrow(x1)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")$nodes
+  ref <- s$x[
+    !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
+    c("sample_id", "CD3", "M")
+  ]
+  x1 <- bn_apply(
+    model$pass1,
+    ref,
+    s$samples,
+    rep("T", nrow(ref)),
+    transform = list(name = "asinh", cofactor = 5),
+    unsupported = "abstain"
+  )$x
+  nodes <- bn_apply(
+    model$pass2,
+    x1,
+    s$samples,
+    rep("T", nrow(x1)),
+    transform = list(name = "asinh", cofactor = 5),
+    unsupported = "abstain"
+  )$nodes
   batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
   g <- names(model$quantiles)[[1]]
   i <- paste(batch, nodes, sep = "\r") == g
@@ -288,7 +341,14 @@ test_that("only batches with exactly the anchor's reference donors get quantile 
   expect_equal(res$x$M[s3], s$x$M[s3], tolerance = 1e-12)
   # Partly bridged b4 takes pass 1 then the pass-2 node shift, with no quantile map.
   r1 <- integrate_sim(model$pass1, s)
-  r2 <- bn_apply(model$pass2, r1$x, s$samples, rep("T", nrow(s$x)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
+  r2 <- bn_apply(
+    model$pass2,
+    r1$x,
+    s$samples,
+    rep("T", nrow(s$x)),
+    transform = list(name = "asinh", cofactor = 5),
+    unsupported = "abstain"
+  )
   s4 <- s$x$sample_id == "S_b4"
   expect_equal(res$x$M[s4], r2$x$M[s4], tolerance = 1e-12)
 })
@@ -300,26 +360,110 @@ test_that("shrink_k = \"eb\" estimates one pseudo-count per marker, floored at 3
   eb <- fit_quantile_sim(s, shrink_k = "eb")
   # Expected k from first principles: median offsets of b2 nodes from the batch-wide offset, their sampling noise.
   probs <- seq(0.025, 0.975, length.out = 21)
-  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
-  integ <- function(m, cells) bn_apply(m, cells, s$samples, rep("T", nrow(cells)))
+  ref <- s$x[
+    !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
+    c("sample_id", "CD3", "M")
+  ]
+  integ <- function(m, cells) {
+    bn_apply(m, cells, s$samples, rep("T", nrow(cells)))
+  }
   x1 <- integ(raw$pass1, ref)$x
   nodes <- integ(raw$pass2, x1)$nodes
   batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
-  med <- function(i) sapply(c("CD3", "M"), function(m) stats::quantile(x1[[m]][i], 0.5, names = FALSE, type = 7))
+  med <- function(i) {
+    sapply(c("CD3", "M"), function(m) {
+      stats::quantile(x1[[m]][i], 0.5, names = FALSE, type = 7)
+    })
+  }
   vr <- function(i) sapply(c("CD3", "M"), function(m) stats::var(x1[[m]][i]))
   glob <- med(batch == "b2") - med(batch == "b1")
   parts <- lapply(sort(unique(nodes)), function(node) {
     ib <- batch == "b2" & nodes == node
     ia <- batch == "b1" & nodes == node
-    list(d2 = (med(ib) - med(ia) - glob)^2, v = (pi / 2) * (vr(ib) / sum(ib) + vr(ia) / sum(ia)), s2 = vr(ib))
+    list(
+      d2 = (med(ib) - med(ia) - glob)^2,
+      v = (pi / 2) * (vr(ib) / sum(ib) + vr(ia) / sum(ia)),
+      s2 = vr(ib)
+    )
   })
-  tau2 <- pmax(Reduce(`+`, lapply(parts, `[[`, "d2")) / length(parts) - Reduce(`+`, lapply(parts, `[[`, "v")) / length(parts), 1e-6)
+  tau2 <- pmax(
+    Reduce(`+`, lapply(parts, `[[`, "d2")) /
+      length(parts) -
+      Reduce(`+`, lapply(parts, `[[`, "v")) / length(parts),
+    1e-6
+  )
   s2 <- do.call(rbind, lapply(parts, `[[`, "s2"))
   k_expected <- pmax((pi / 2) * apply(s2, 2, stats::median) / tau2, 300)
   expect_equal(eb$settings$shrink_k_marker, k_expected, tolerance = 1e-10)
   expect_true(all(eb$settings$shrink_k_marker >= 300))
   expect_identical(eb$settings$shrink_k, "eb")
   expect_shrunk_tables(s, raw, eb, eb$settings$shrink_k_marker)
-  steps <- unlist(lapply(eb$quantiles, function(q) apply(q, 2, function(v) min(diff(v)))))
+  steps <- unlist(lapply(eb$quantiles, function(q) {
+    apply(q, 2, function(v) min(diff(v)))
+  }))
   expect_true(all(steps >= 0))
+})
+
+test_that("target = \"virtual\" maps every batch, the anchor too, to the per-node mean of batch quantile curves", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  raw <- fit_quantile_sim(s, shrink_k = 0, target = "virtual")
+  expect_identical(raw$settings$target, "virtual")
+  # Expected tables from first principles, on this model's own pass-1-corrected reference cells and pass-2 nodes.
+  probs <- seq(0.025, 0.975, length.out = 21)
+  ref <- s$x[
+    !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
+    c("sample_id", "CD3", "M")
+  ]
+  integ <- function(m, cells) {
+    bn_apply(m, cells, s$samples, rep("T", nrow(cells)))
+  }
+  x1 <- integ(raw$pass1, ref)$x
+  nodes <- integ(raw$pass2, x1)$nodes
+  batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
+  q_of <- function(i) {
+    sapply(c("CD3", "M"), function(m) {
+      stats::quantile(x1[[m]][i], probs, names = FALSE, type = 7)
+    })
+  }
+  glob_v <- (q_of(batch == "b1") + q_of(batch == "b2")) / 2
+  k <- 300
+  shrunk <- fit_quantile_sim(s, shrink_k = k, target = "virtual")
+  for (node in unique(nodes)) {
+    qv <- (q_of(batch == "b1" & nodes == node) +
+      q_of(batch == "b2" & nodes == node)) /
+      2
+    expect_equal(
+      unname(raw$quantiles[[paste("(virtual)", node, sep = "\r")]]),
+      unname(qv),
+      tolerance = 1e-12
+    )
+    for (b in c("b1", "b2")) {
+      i <- batch == b & nodes == node
+      w <- sum(i) / (sum(i) + k)
+      expected <- qv +
+        w * (q_of(i) - qv) +
+        (1 - w) * (q_of(batch == b) - glob_v)
+      expect_equal(
+        unname(shrunk$quantiles[[paste(b, node, sep = "\r")]]),
+        unname(apply(expected, 2, sort)),
+        tolerance = 1e-12
+      )
+    }
+  }
+  # The anchor batch is corrected too, and its reference cells land on the same scale as b2's.
+  res <- integ(raw, ref)
+  is_b1 <- s$samples$batch[match(ref$sample_id, s$samples$sample_id)] == "b1"
+  expect_gt(max(abs(res$x$M[is_b1] - ref$M[is_b1])), 0.05)
+  med <- tapply(res$x$M, list(is_b1, res$nodes), stats::median)
+  expect_lt(max(abs(med[1, ] - med[2, ]), na.rm = TRUE), 0.03)
+})
+
+test_that("target = \"virtual\" refuses shrink_k = \"eb\" and a batch named (virtual)", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  expect_error(fit_quantile_sim(s, target = "virtual", shrink_k = "eb"), "eb")
+  expect_error(fit_quantile_sim(s, target = "mean"), "target")
+  s$samples$batch[s$samples$batch == "b2"] <- "(virtual)"
+  expect_error(fit_quantile_sim(s, target = "virtual"), "virtual")
 })

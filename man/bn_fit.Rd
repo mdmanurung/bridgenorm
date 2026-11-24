@@ -25,6 +25,7 @@ bn_fit(
   quantile_probs = seq(0.025, 0.975, length.out = 21),
   tail = "shift",
   shrink_k = 300,
+  target = "anchor",
   sample_ids = NULL
 )
 }
@@ -86,6 +87,13 @@ empirical Bayes from how much node offsets vary beyond their sampling
 noise, never below 300; the values are stored in
 \code{settings$shrink_k_marker}. In round 3b it lowered node-level RMSE by
 about 5\% but kept planted biology slightly less well than 300.}
+
+\item{target}{\code{"anchor"} corrects every batch to the anchor batch.
+\code{"virtual"} corrects every batch, the anchor included, to a virtual
+reference: per reference summary and per SOM node, the equal-weight mean
+over batches (for quantiles, the mean of the batches' quantile curves).
+It covers the same summaries and nodes as the anchor, which still sets
+the bridges and the map. Not combined with \code{shrink_k = "eb"}.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}

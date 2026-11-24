@@ -91,6 +91,12 @@
 #'   noise, never below 300; the values are stored in
 #'   \code{settings$shrink_k_marker}. In round 3b it lowered node-level RMSE by
 #'   about 5\% but kept planted biology slightly less well than 300.
+#' @param target \code{"anchor"} corrects every batch to the anchor batch.
+#'   \code{"virtual"} corrects every batch, the anchor included, to a virtual
+#'   reference: per reference summary and per SOM node, the equal-weight mean
+#'   over batches (for quantiles, the mean of the batches' quantile curves).
+#'   It covers the same summaries and nodes as the anchor, which still sets
+#'   the bridges and the map. Not combined with \code{shrink_k = "eb"}.
 #' @param sample_ids Optional sample id per row; required for a matrix
 #'   \code{x}.
 #'
@@ -130,6 +136,7 @@ bn_fit <- function(
   quantile_probs = seq(0.025, 0.975, length.out = 21),
   tail = "shift",
   shrink_k = 300,
+  target = "anchor",
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
@@ -165,6 +172,19 @@ bn_fit <- function(
   ) {
     stop("'shrink_k' must be one finite number >= 0, or \"eb\".", call. = FALSE)
   }
+  .bn_check_target(target)
+  if (target == "virtual" && identical(shrink_k, "eb")) {
+    stop("target = \"virtual\" does not take shrink_k = \"eb\".", call. = FALSE)
+  }
+  if (target == "virtual" && .bn_virtual %in% samples$batch) {
+    stop(
+      sprintf(
+        "A batch is named '%s', the virtual reference's key.",
+        .bn_virtual
+      ),
+      call. = FALSE
+    )
+  }
 
   # Reference rows only, as .bn_fit_nodes() uses.
   d <- .bn_cells(x, samples, population, markers, sample_ids)
@@ -191,7 +211,8 @@ bn_fit <- function(
       seed = seed,
       assignment = assignment,
       fallback = fallback,
-      sample_ids = ids_ref
+      sample_ids = ids_ref,
+      target = target
     )
   }
   integrate_pass <- function(m, xp) {
@@ -222,9 +243,18 @@ bn_fit <- function(
   # A quantile map matches pooled reference distributions, so only batches whose reference donors are exactly
   # the anchor's get tables; an unbridged or partly bridged batch keeps the pass-2 shift (heb 0.7.2).
   ref_cells <- d$cells[ref_rows, ]
-  donors <- lapply(split(ref_cells$reference_id, ref_cells$batch), \(r) sort(unique(r)))
-  same_donors <- names(donors)[vapply(donors, identical, logical(1), donors[[anchor]])]
-  groups <- groups[n_cells >= min_cells & sub("\r.*", "", names(groups)) %in% same_donors]
+  donors <- lapply(split(ref_cells$reference_id, ref_cells$batch), \(r) {
+    sort(unique(r))
+  })
+  same_donors <- names(donors)[vapply(
+    donors,
+    identical,
+    logical(1),
+    donors[[anchor]]
+  )]
+  groups <- groups[
+    n_cells >= min_cells & sub("\r.*", "", names(groups)) %in% same_donors
+  ]
   q_table <- function(i) {
     q <- apply(
       x1m[i, , drop = FALSE],
@@ -238,18 +268,41 @@ bn_fit <- function(
   }
   quantiles <- lapply(groups, q_table)
 
-  # Shrink each non-anchor node offset curve toward its batch-wide offset curve (TR3k).
+  # Target curves per node and batch-wide: the anchor's, or with target = "virtual" the equal-weight mean of the
+  # batches' curves (VR3) in each node the anchor has a table for.
   ref_batch <- d$cells$batch[ref_rows]
   batch_q <- lapply(split(seq_along(ref_batch), ref_batch), q_table)
-  todo <- Filter(
-    \(g) {
-      sub("\r.*", "", g) != anchor &&
-        !is.null(quantiles[[paste(anchor, sub(".*\r", "", g), sep = "\r")]])
-    },
+  node_of <- \(g) sub(".*\r", "", g)
+  covered <- Filter(
+    \(g) !is.null(quantiles[[paste(anchor, node_of(g), sep = "\r")]]),
     names(quantiles)
   )
+  if (target == "virtual") {
+    by_node <- split(covered, node_of(covered))
+    target_q <- lapply(by_node, \(gs) Reduce(`+`, quantiles[gs]) / length(gs))
+    names(target_q) <- paste(.bn_virtual, names(by_node), sep = "\r")
+    target_batch_q <- Reduce(`+`, batch_q[same_donors]) / length(same_donors)
+    target_key <- \(g) paste(.bn_virtual, node_of(g), sep = "\r")
+    todo <- covered
+  } else {
+    target_q <- quantiles
+    target_batch_q <- batch_q[[anchor]]
+    target_key <- \(g) paste(anchor, node_of(g), sep = "\r")
+    todo <- covered[sub("\r.*", "", covered) != anchor]
+  }
+
+  # Shrink each node offset curve toward its batch-wide offset curve (TR3k); the anchor's own curves stay as
+  # fitted when it is the target.
   k_marker <- if (identical(shrink_k, "eb")) {
-    .bn_eb_shrink_k(quantiles, groups, x1m, todo, anchor, batch_q, quantile_probs)
+    .bn_eb_shrink_k(
+      quantiles,
+      groups,
+      x1m,
+      todo,
+      anchor,
+      batch_q,
+      quantile_probs
+    )
   } else {
     stats::setNames(rep(shrink_k, length(markers)), markers)
   }
@@ -257,7 +310,7 @@ bn_fit <- function(
     shrunk <- quantiles
     for (g in todo) {
       b <- sub("\r.*", "", g)
-      qa <- quantiles[[paste(anchor, sub(".*\r", "", g), sep = "\r")]]
+      qa <- target_q[[target_key(g)]]
       # One weight per marker column; with a number shrink_k every column has the same weight.
       w <- matrix(
         n_cells[[g]] / (n_cells[[g]] + k_marker),
@@ -267,12 +320,15 @@ bn_fit <- function(
       )
       q <- qa +
         w * (quantiles[[g]] - qa) +
-        (1 - w) * (batch_q[[b]] - batch_q[[anchor]])
+        (1 - w) * (batch_q[[b]] - target_batch_q)
       # Sort each column (rearrangement): the mix of three monotone curves can cross itself, and a
       # non-monotone table would swap the order of cells (heb 0.7.1).
       shrunk[[g]] <- apply(q, 2, sort)
     }
     quantiles <- shrunk
+  }
+  if (target == "virtual") {
+    quantiles <- c(quantiles, target_q)
   }
 
   model <- structure(
@@ -284,7 +340,8 @@ bn_fit <- function(
         min_cells = min_cells,
         quantile_type = 7L,
         shrink_k = shrink_k,
-        shrink_k_marker = k_marker
+        shrink_k_marker = k_marker,
+        target = target
       ),
       markers = markers,
       transform = pass1$transform,
@@ -371,11 +428,17 @@ bn_fit <- function(
   v <- .bn_marker_matrix(r1$x, model$markers)
   out <- .bn_marker_matrix(r2$x, model$markers)
 
-  # Quantile map where the cell's batch and the anchor both have quantiles in its pass-2 node.
+  # Quantile map where the cell's batch and the target both have quantiles in its pass-2 node. Models from
+  # 0.9.0 have no settings$target and map to the anchor.
+  target <- if (identical(model$settings$target, "virtual")) {
+    .bn_virtual
+  } else {
+    model$anchor
+  }
   key <- paste(d$cells$batch, r2$nodes, sep = "\r")
   mapped_keys <- character(0)
   for (g in intersect(unique(key), names(model$quantiles))) {
-    qa <- model$quantiles[[paste(model$anchor, sub(".*\r", "", g), sep = "\r")]]
+    qa <- model$quantiles[[paste(target, sub(".*\r", "", g), sep = "\r")]]
     if (is.null(qa)) {
       next
     }
@@ -461,13 +524,29 @@ print.bn_node_quantile_model <- function(x, ...) {
   invisible(x)
 }
 
+# Key of the virtual reference's quantile tables in model$quantiles ("(virtual)\rnode"); no batch may take it.
+.bn_virtual <- "(virtual)"
+
 # Empirical-Bayes shrink_k per marker (shrink_k = "eb"; tusoskill round 3b c031, decision R3b15). The median offset
 # of a (batch, node) from its batch-wide target, d, has variance tau^2 (true node deviation) plus sampling noise
 # v = (pi/2) (s2_g / n_g + s2_a / n_a). tau^2 = mean(d^2) - mean(v), floored at 1e-6; k = (pi/2) median(s2_g) / tau^2,
 # the normal-means shrinkage weight n / (n + k). k never goes below 300, the tested floor.
-.bn_eb_shrink_k <- function(quantiles, groups, x1m, todo, anchor, batch_q, quantile_probs, floor = 300) {
+.bn_eb_shrink_k <- function(
+  quantiles,
+  groups,
+  x1m,
+  todo,
+  anchor,
+  batch_q,
+  quantile_probs,
+  floor = 300
+) {
   mid <- which.min(abs(quantile_probs - 0.5))
-  s2 <- t(vapply(groups, \(i) apply(x1m[i, , drop = FALSE], 2, stats::var), numeric(ncol(x1m))))
+  s2 <- t(vapply(
+    groups,
+    \(i) apply(x1m[i, , drop = FALSE], 2, stats::var),
+    numeric(ncol(x1m))
+  ))
   n <- lengths(groups)
   parts <- lapply(todo, \(g) {
     a <- paste(anchor, sub(".*\r", "", g), sep = "\r")
@@ -477,7 +556,8 @@ print.bn_node_quantile_model <- function(x, ...) {
     rbind(d2 = d^2, v = v)
   })
   tau2 <- pmax(
-    Reduce(`+`, lapply(parts, \(p) p["d2", ])) / length(todo) -
+    Reduce(`+`, lapply(parts, \(p) p["d2", ])) /
+      length(todo) -
       Reduce(`+`, lapply(parts, \(p) p["v", ])) / length(todo),
     1e-6
   )

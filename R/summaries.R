@@ -136,13 +136,25 @@
   )
 }
 
-# Anchor targets: the donor summaries of the anchor batch.
-.bn_targets <- function(donor, anchor) {
+# Targets: the donor summaries of the anchor batch, or with target = "virtual" each summary's equal-weight
+# mean over batches (decision VR3), kept where the anchor has that summary so both targets cover the same cells.
+.bn_targets <- function(donor, anchor, target = "anchor") {
   anc <- donor[donor$batch == anchor, , drop = FALSE]
   if (nrow(anc) == 0) {
     stop(
       sprintf("Anchor batch '%s' has no reference summary.", anchor),
       call. = FALSE
+    )
+  }
+  if (identical(target, "virtual")) {
+    key <- paste(donor$reference_id, donor$population, donor$marker, sep = "\r")
+    g <- split(seq_len(nrow(donor)), key)
+    g <- g[paste(anc$reference_id, anc$population, anc$marker, sep = "\r")]
+    anc$value <- vapply(g, function(ii) mean(sort(donor$value[ii])), numeric(1))
+    anc$n_aliquots <- vapply(
+      g,
+      function(ii) sum(donor$n_aliquots[ii]),
+      integer(1)
     )
   }
   tibble::tibble(

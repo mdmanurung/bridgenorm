@@ -13,6 +13,7 @@ bn_fit_paired(
   anchor,
   min_cells = 50,
   unbridged = "abstain",
+  target = "anchor",
   sample_ids = NULL
 )
 }
@@ -41,6 +42,13 @@ scale \code{x} is on. It is recorded, never applied.}
 \item{unbridged}{\code{"abstain"} leaves a batch that shares no bridge
 donor with the anchor raw and flags it; \code{"stop"} refuses the fit.}
 
+\item{target}{\code{"anchor"} corrects every batch to the anchor batch.
+\code{"virtual"} corrects every batch, the anchor included, to a virtual
+reference: per reference summary and per SOM node, the equal-weight mean
+over batches (for quantiles, the mean of the batches' quantile curves).
+It covers the same summaries and nodes as the anchor, which still sets
+the bridges and the map. Not combined with \code{shrink_k = "eb"}.}
+
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}
 }
@@ -65,7 +73,9 @@ unseen at fit time.
 \code{se_donor} is the SD of the paired differences over references divided
 by the square root of their number (\code{NA} with one reference), with
 \code{df} = number of references - 1. Anchor rows have estimate 0 and
-\code{support = "anchor"}.
+\code{support = "anchor"}. With \code{target = "virtual"} each reference
+summary of the anchor is replaced by its mean over the bridged batches, so
+the anchor batch gets an effect too.
 
 With \code{unbridged = "abstain"}, a batch that shares no reference with the
 anchor (after \code{min_cells}) gets no effect, so \code{\link{bn_apply}} leaves its cells raw

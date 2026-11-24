@@ -14,7 +14,9 @@
 #' \code{se_donor} is the SD of the paired differences over references divided
 #' by the square root of their number (\code{NA} with one reference), with
 #' \code{df} = number of references - 1. Anchor rows have estimate 0 and
-#' \code{support = "anchor"}.
+#' \code{support = "anchor"}. With \code{target = "virtual"} each reference
+#' summary of the anchor is replaced by its mean over the bridged batches, so
+#' the anchor batch gets an effect too.
 #'
 #' With \code{unbridged = "abstain"}, a batch that shares no reference with the
 #' anchor (after \code{min_cells}) gets no effect, so \code{\link{bn_apply}} leaves its cells raw
@@ -57,6 +59,7 @@ bn_fit_paired <- function(
   anchor,
   min_cells = 50,
   unbridged = "abstain",
+  target = "anchor",
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
@@ -68,6 +71,7 @@ bn_fit_paired <- function(
     anchor = missing(anchor)
   ))
   .bn_check_choice(unbridged, "unbridged", c("stop", "abstain"))
+  .bn_check_target(target)
   samples <- .bn_check_samples(samples)
   # Paired shift has no hierarchy; every batch sits in one study.
   hierarchy <- data.frame(
@@ -93,13 +97,20 @@ bn_fit_paired <- function(
   com$bridges <- .bn_bridges_after_min_cells(com$batches, s$summ, anchor)
   unbridged_batches <- .bn_gate(com$bridges, unbridged)
   donor <- .bn_donor_level(s$summ)
-  targets <- .bn_targets(donor, anchor)
+  # Unbridged batches never shape a virtual target.
+  targets <- .bn_targets(
+    donor[!donor$batch %in% unbridged_batches, , drop = FALSE],
+    anchor,
+    target
+  )
   effects <- .bn_paired_effects(donor, targets, "fit")
-  effects$support[effects$batch == anchor] <- "anchor"
+  if (target == "anchor") {
+    effects$support[effects$batch == anchor] <- "anchor"
+  }
   effects <- effects[!effects$batch %in% unbridged_batches, , drop = FALSE]
   .bn_freeze(
     "paired_shift",
-    list(unbridged = unbridged),
+    list(unbridged = unbridged, target = target),
     com,
     anchor,
     min_cells,

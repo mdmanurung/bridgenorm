@@ -86,7 +86,11 @@
 #' @param tail Rule beyond the outer quantiles; only \code{"shift"}.
 #' @param shrink_k Non-negative pseudo-count of cells for the shrinkage toward
 #'   the batch-wide offset curve. Larger values borrow more; \code{0} turns
-#'   shrinkage off.
+#'   shrinkage off. \code{"eb"} estimates one pseudo-count per marker by
+#'   empirical Bayes from how much node offsets vary beyond their sampling
+#'   noise, never below 300; the values are stored in
+#'   \code{settings$shrink_k_marker}. In round 3b it lowered node-level RMSE by
+#'   about 5\% but kept planted biology slightly less well than 300.
 #' @param sample_ids Optional sample id per row; required for a matrix
 #'   \code{x}.
 #'
@@ -153,12 +157,13 @@ bn_fit <- function(
     )
   }
   if (
-    !is.numeric(shrink_k) ||
-      length(shrink_k) != 1 ||
-      !is.finite(shrink_k) ||
-      shrink_k < 0
+    !identical(shrink_k, "eb") &&
+      (!is.numeric(shrink_k) ||
+        length(shrink_k) != 1 ||
+        !is.finite(shrink_k) ||
+        shrink_k < 0)
   ) {
-    stop("'shrink_k' must be one finite number >= 0.", call. = FALSE)
+    stop("'shrink_k' must be one finite number >= 0, or \"eb\".", call. = FALSE)
   }
 
   # Reference rows only, as .bn_fit_nodes() uses.
@@ -234,17 +239,32 @@ bn_fit <- function(
   quantiles <- lapply(groups, q_table)
 
   # Shrink each non-anchor node offset curve toward its batch-wide offset curve (TR3k).
-  if (shrink_k > 0) {
-    ref_batch <- d$cells$batch[ref_rows]
-    batch_q <- lapply(split(seq_along(ref_batch), ref_batch), q_table)
+  ref_batch <- d$cells$batch[ref_rows]
+  batch_q <- lapply(split(seq_along(ref_batch), ref_batch), q_table)
+  todo <- Filter(
+    \(g) {
+      sub("\r.*", "", g) != anchor &&
+        !is.null(quantiles[[paste(anchor, sub(".*\r", "", g), sep = "\r")]])
+    },
+    names(quantiles)
+  )
+  k_marker <- if (identical(shrink_k, "eb")) {
+    .bn_eb_shrink_k(quantiles, groups, x1m, todo, anchor, batch_q, quantile_probs)
+  } else {
+    stats::setNames(rep(shrink_k, length(markers)), markers)
+  }
+  if (any(k_marker > 0)) {
     shrunk <- quantiles
-    for (g in names(quantiles)) {
+    for (g in todo) {
       b <- sub("\r.*", "", g)
       qa <- quantiles[[paste(anchor, sub(".*\r", "", g), sep = "\r")]]
-      if (b == anchor || is.null(qa)) {
-        next
-      }
-      w <- n_cells[[g]] / (n_cells[[g]] + shrink_k)
+      # One weight per marker column; with a number shrink_k every column has the same weight.
+      w <- matrix(
+        n_cells[[g]] / (n_cells[[g]] + k_marker),
+        nrow(qa),
+        length(markers),
+        byrow = TRUE
+      )
       q <- qa +
         w * (quantiles[[g]] - qa) +
         (1 - w) * (batch_q[[b]] - batch_q[[anchor]])
@@ -263,7 +283,8 @@ bn_fit <- function(
         tail = tail,
         min_cells = min_cells,
         quantile_type = 7L,
-        shrink_k = shrink_k
+        shrink_k = shrink_k,
+        shrink_k_marker = k_marker
       ),
       markers = markers,
       transform = pass1$transform,
@@ -438,4 +459,28 @@ print.bn_node_quantile_model <- function(x, ...) {
     "\n"
   )
   invisible(x)
+}
+
+# Empirical-Bayes shrink_k per marker (shrink_k = "eb"; tusoskill round 3b c031, decision R3b15). The median offset
+# of a (batch, node) from its batch-wide target, d, has variance tau^2 (true node deviation) plus sampling noise
+# v = (pi/2) (s2_g / n_g + s2_a / n_a). tau^2 = mean(d^2) - mean(v), floored at 1e-6; k = (pi/2) median(s2_g) / tau^2,
+# the normal-means shrinkage weight n / (n + k). k never goes below 300, the tested floor.
+.bn_eb_shrink_k <- function(quantiles, groups, x1m, todo, anchor, batch_q, quantile_probs, floor = 300) {
+  mid <- which.min(abs(quantile_probs - 0.5))
+  s2 <- t(vapply(groups, \(i) apply(x1m[i, , drop = FALSE], 2, stats::var), numeric(ncol(x1m))))
+  n <- lengths(groups)
+  parts <- lapply(todo, \(g) {
+    a <- paste(anchor, sub(".*\r", "", g), sep = "\r")
+    target <- batch_q[[sub("\r.*", "", g)]] - batch_q[[anchor]]
+    d <- quantiles[[g]][mid, ] - quantiles[[a]][mid, ] - target[mid, ]
+    v <- (pi / 2) * (s2[g, ] / n[[g]] + s2[a, ] / n[[a]])
+    rbind(d2 = d^2, v = v)
+  })
+  tau2 <- pmax(
+    Reduce(`+`, lapply(parts, \(p) p["d2", ])) / length(todo) -
+      Reduce(`+`, lapply(parts, \(p) p["v", ])) / length(todo),
+    1e-6
+  )
+  k <- (pi / 2) * apply(s2[todo, , drop = FALSE], 2, stats::median) / tau2
+  stats::setNames(pmax(k, floor), colnames(x1m))
 }

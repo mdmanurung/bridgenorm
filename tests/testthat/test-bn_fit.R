@@ -218,10 +218,11 @@ expect_shrunk_tables <- function(s, raw, shrunk, k) {
     ga <- paste("b1", node, sep = "\r")
     skip_if(is.null(raw$quantiles[[g]]) || is.null(raw$quantiles[[ga]]))
     n <- sum(batch == "b2" & nodes == node)
-    w <- n / (n + k)
-    expected <- q_of(batch == "b1" & nodes == node) +
-      w * (q_of(batch == "b2" & nodes == node) - q_of(batch == "b1" & nodes == node)) +
-      (1 - w) * glob_off
+    w <- n / (n + k) # k: one number, or one per marker (CD3, M)
+    qa <- q_of(batch == "b1" & nodes == node)
+    expected <- qa +
+      sweep(q_of(batch == "b2" & nodes == node) - qa, 2, w, "*") +
+      sweep(glob_off, 2, 1 - w, "*")
     expect_equal(unname(shrunk$quantiles[[g]]), unname(apply(expected, 2, sort)), tolerance = 1e-12)
     expect_identical(shrunk$quantiles[[ga]], raw$quantiles[[ga]])
   }
@@ -290,4 +291,35 @@ test_that("only batches with exactly the anchor's reference donors get quantile 
   r2 <- bn_apply(model$pass2, r1$x, s$samples, rep("T", nrow(s$x)), transform = list(name = "asinh", cofactor = 5), unsupported = "abstain")
   s4 <- s$x$sample_id == "S_b4"
   expect_equal(res$x$M[s4], r2$x$M[s4], tolerance = 1e-12)
+})
+
+test_that("shrink_k = \"eb\" estimates one pseudo-count per marker, floored at 300", {
+  skip_if_not_installed("kohonen")
+  s <- quantile_sim()
+  raw <- fit_quantile_sim(s, shrink_k = 0)
+  eb <- fit_quantile_sim(s, shrink_k = "eb")
+  # Expected k from first principles: median offsets of b2 nodes from the batch-wide offset, their sampling noise.
+  probs <- seq(0.025, 0.975, length.out = 21)
+  ref <- s$x[!is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]), c("sample_id", "CD3", "M")]
+  integ <- function(m, cells) bn_apply(m, cells, s$samples, rep("T", nrow(cells)))
+  x1 <- integ(raw$pass1, ref)$x
+  nodes <- integ(raw$pass2, x1)$nodes
+  batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
+  med <- function(i) sapply(c("CD3", "M"), function(m) stats::quantile(x1[[m]][i], 0.5, names = FALSE, type = 7))
+  vr <- function(i) sapply(c("CD3", "M"), function(m) stats::var(x1[[m]][i]))
+  glob <- med(batch == "b2") - med(batch == "b1")
+  parts <- lapply(sort(unique(nodes)), function(node) {
+    ib <- batch == "b2" & nodes == node
+    ia <- batch == "b1" & nodes == node
+    list(d2 = (med(ib) - med(ia) - glob)^2, v = (pi / 2) * (vr(ib) / sum(ib) + vr(ia) / sum(ia)), s2 = vr(ib))
+  })
+  tau2 <- pmax(Reduce(`+`, lapply(parts, `[[`, "d2")) / length(parts) - Reduce(`+`, lapply(parts, `[[`, "v")) / length(parts), 1e-6)
+  s2 <- do.call(rbind, lapply(parts, `[[`, "s2"))
+  k_expected <- pmax((pi / 2) * apply(s2, 2, stats::median) / tau2, 300)
+  expect_equal(eb$settings$shrink_k_marker, k_expected, tolerance = 1e-10)
+  expect_true(all(eb$settings$shrink_k_marker >= 300))
+  expect_identical(eb$settings$shrink_k, "eb")
+  expect_shrunk_tables(s, raw, eb, eb$settings$shrink_k_marker)
+  steps <- unlist(lapply(eb$quantiles, function(q) apply(q, 2, function(v) min(diff(v)))))
+  expect_true(all(steps >= 0))
 })

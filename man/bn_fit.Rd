@@ -81,7 +81,11 @@ at which batch and anchor quantiles are matched.}
 
 \item{shrink_k}{Non-negative pseudo-count of cells for the shrinkage toward
 the batch-wide offset curve. Larger values borrow more; \code{0} turns
-shrinkage off.}
+shrinkage off. \code{"eb"} estimates one pseudo-count per marker by
+empirical Bayes from how much node offsets vary beyond their sampling
+noise, never below 300; the values are stored in
+\code{settings$shrink_k_marker}. In round 3b it lowered node-level RMSE by
+about 5\% but kept planted biology slightly less well than 300.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}

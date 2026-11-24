@@ -17,7 +17,7 @@ Only batches whose bridge donors equal the anchor's get quantile maps. A batch t
 
 Two options are off by default. Estimates at the defaults are unchanged from 0.9.0.
 
-- `target = "virtual"` corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches' quantile curves. On held-out bridge wells (mean fold score, lower is better; 3 folds, SOM seeds 473-475), it lowered the score on data set A from 0.955 to 0.906 and on data set B (grid 6x6, `min_cells` 25) from 0.760 to 0.744. At the data set B defaults it was a wash (0.796 vs 0.798). The noise floor is unmeasured. It does not combine with `shrink_k = "eb"`.
+- `target = "virtual"` corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches' quantile curves. It lowered the held-out score on the full data set A data (0.955 to 0.906), but the gain did not hold on subsets: with 8 of the 11 scorable batches it was worse on every data set (+0.03 to +0.05), and leaving out one study changed its direction. The default stays `target = "anchor"`. It does not combine with `shrink_k = "eb"`.
 - `shrink_k = "eb"` estimates one pseudo-count per marker by empirical Bayes, never below 300. On data set A (fresh sim seeds 1008-1009) it lowered node5 RMSE by 4.9-6.5% but made confounded-expression recovery slightly worse. On the data set B tuning round it was worse than the matching scalar `shrink_k` (0.0521 vs 0.0444 at grid 8x8, 0.0439 vs 0.0303 at grid 6x6; |1 - recovery|, lower is better).
 
 `bn_fit_paired()` fits the baseline: one paired shift per population and marker, with no nodes and no quantile maps. Every other model must beat it.

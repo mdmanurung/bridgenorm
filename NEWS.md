@@ -1,3 +1,8 @@
+# bridgenorm (development version)
+
+* Docs: the virtual target's held-out gain did not hold on batch and study subsets (decision VS8); README and
+  vignette now say so. `target = "anchor"` stays the default.
+
 # bridgenorm 0.10.0
 
 * No default changes. Estimates at the defaults (`shrink_k = 300`, `target = "anchor"`) are unchanged from 0.9.0,

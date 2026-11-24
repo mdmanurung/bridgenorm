@@ -154,7 +154,7 @@ round(rbind(
 ), 2)
 ```
 
-On held-out bridge wells, the virtual target lowered the mean fold score on data set A from 0.955 to 0.906 (lower in 7 of 9 pairs) and on data set B at grid 6x6 with `min_cells = 25` from 0.760 to 0.744 (7 of 9). At the default settings on data set B it did not help (0.796 and 0.798). The noise floor of these scores is unmeasured. `bn_fit_paired()` takes the same `target` argument.
+On the full held-out benchmark, the virtual target lowered the mean fold score on data set A from 0.955 to 0.906, but the gain did not hold on subsets of batches or studies: with 8 of the 11 scorable batches it scored worse on both data sets. Use it as an option, not a default. `bn_fit_paired()` takes the same `target` argument.
 
 `shrink_k = "eb"` replaces the single pseudo-count with one per marker, estimated by empirical Bayes from how much node offsets vary beyond their sampling noise. The estimate never falls below 300. On data set A (fresh sim seeds 1008-1009) it lowered node5 RMSE by 4.9 to 6.5%, but it made confounded-expression recovery slightly worse at all three SOM seeds. On the data set B tuning round it was worse than the matching scalar value (0.0521 against 0.0444 at grid 8x8, 0.0439 against 0.0303 at grid 6x6, as |1 - recovery|, lower is better). It is an option kept for study. The default scalar 300 did better on the data set B tuning round. It cannot be combined with `target = "virtual"`.
 

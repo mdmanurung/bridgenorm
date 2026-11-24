@@ -24,6 +24,21 @@ Two options are off by default. Estimates at the defaults are unchanged from 0.9
 
 The anchor, SOM grid, mapping markers, seed and transform depend on the data and have no default. The other settings default to the values benchmarked on two spectral cytometry data sets (data set A and data set B).
 
+## Comparison with CytoNorm and cyCombine
+
+Held-out score: the median over markers of the worst batch-pair EMD on held-out bridge wells (3 wells; lower is better).
+
+| Data set | bridgenorm | CytoNorm 2.0.10 | cyCombine 0.3.0 | Paired shift | Uncorrected |
+|---|---|---|---|---|---|
+| data set A (heb 0.7.0) | 0.954 | 1.592 | 3.533 | 2.376 | 7.307 |
+| data set B (0.9.0 defaults; grid 6x6) | 0.797; 0.766 | 0.805 | 1.134 | 1.442 | 2.454 |
+
+bridgenorm scored lowest on both data sets. On data set B its lead over CytoNorm is within the spread across wells (SD about 0.2 for both). cyCombine was fitted on the scored cells, which favours it. CytoNorm ran with its defaults (FlowSOM 15x15, 10 clusters).
+
+On the data set B confounded simulation, bridgenorm also recovered expression differences best (|1 - recovery| 0.030 at grid 6x6, 0.044 at defaults, against 0.050 for CytoNorm and 0.118 for cyCombine). These sim seeds also tuned the grid 6x6 setting, so they favour it; a rerun on unused seeds is planned. Cell RMSE to the simulated truth favours bridgenorm by design, because the truth is the anchor batch and CytoNorm targets the batch mean.
+
+The comparison used `target = "anchor"`. The virtual target has not been compared with CytoNorm or cyCombine.
+
 ## Install
 
 ```r

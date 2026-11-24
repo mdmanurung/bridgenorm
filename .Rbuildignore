@@ -1,8 +1,10 @@
 ^\.git$
+^\.claude$
 ^README\.Rmd$
 ^plans$
 ^experiments$
 ^HANDOFF\.md$
-^_pkgdown\.yml$
 ^docs$
-^pkgdown$
+^altdoc$
+^_quarto$
+^tools$

@@ -11,3 +11,6 @@ experiments/*/*.html
 HANDOFF.md
 docs/
 experiments/logs_tests/
+altdoc/freeze.rds
+_quarto/*
+!_quarto/_freeze/

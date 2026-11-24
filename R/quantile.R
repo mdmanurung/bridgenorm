@@ -8,16 +8,16 @@
 #'
 #' Batch effects can change the shape of a marker's distribution within a
 #' cell state, not only its location. \code{bn_fit()} runs a
-#' node shift (\code{\link{.bn_fit_nodes}}), then refits a second map on the
+#' node shift (\code{.bn_fit_nodes()}), then refits a second map on the
 #' shifted cells and, in each second-pass node, maps every batch's marker
 #' quantiles onto the anchor's.
 #'
 #' @details
 #' Steps, all on reference cells only:
 #' \enumerate{
-#'   \item Pass 1: \code{\link{.bn_fit_nodes}} with the given settings; its
+#'   \item Pass 1: \code{.bn_fit_nodes()} with the given settings; its
 #'     correction is applied to the reference cells.
-#'   \item Pass 2: \code{\link{.bn_fit_nodes}} again, with the same settings,
+#'   \item Pass 2: \code{.bn_fit_nodes()} again, with the same settings,
 #'     on the pass-1 cells. Its node shifts cover the cells pass 2 cannot
 #'     map by quantiles.
 #'   \item For each (batch, pass-2 node) with at least \code{min_cells}
@@ -89,8 +89,9 @@
 #'   shrinkage off. \code{"eb"} estimates one pseudo-count per marker by
 #'   empirical Bayes from how much node offsets vary beyond their sampling
 #'   noise, never below 300; the values are stored in
-#'   \code{settings$shrink_k_marker}. In round 3b it lowered node-level RMSE by
-#'   about 5\% but kept planted biology slightly less well than 300.
+#'   \code{settings$shrink_k_marker}. In round 3b it lowered node5 RMSE by
+#'   4.9-6.5\% (fresh sim seeds 1008-1009) but made confounded-expression
+#'   recovery slightly worse than 300.
 #' @param target \code{"anchor"} corrects every batch to the anchor batch.
 #'   \code{"virtual"} corrects every batch, the anchor included, to a virtual
 #'   reference: per reference summary and per SOM node, the equal-weight mean

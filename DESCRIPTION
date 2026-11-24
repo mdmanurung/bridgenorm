@@ -1,6 +1,6 @@
 Package: bridgenorm
 Title: Cytometry Batch Correction from Bridge Samples
-Version: 0.9.0
+Version: 0.10.0
 Authors@R:
     person("M. D.", "Manurung", email = "m.d.manurung@lumc.nl", role = c("aut", "cre"))
 Description: Estimates technical batch effects in cytometry data from bridge
@@ -9,8 +9,13 @@ Description: Estimates technical batch effects in cytometry data from bridge
     is fitted per batch and node, and each batch's marker quantiles are then
     mapped onto those of an anchor batch within each node, shrinking small
     nodes toward the batch-wide curve. A paired-shift baseline is included.
-    Study samples never enter a fit. Models are frozen with a digest and
-    applied to new data without changing earlier corrections. Formerly 'heb'.
+    Batches can instead be mapped onto an optional virtual reference, the
+    mean of all batches. Study samples never enter a fit. Models are frozen
+    with a digest and applied to new data without changing earlier
+    corrections. Formerly 'heb'.
+URL: https://mdmanurung.github.io/bridgenorm/,
+    https://github.com/mdmanurung/bridgenorm
+BugReports: https://github.com/mdmanurung/bridgenorm/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = FALSE)

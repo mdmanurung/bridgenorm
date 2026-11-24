@@ -119,6 +119,45 @@ for (panel in c("uncorrected", "corrected")) {
 par(op)
 ```
 
+## Two options for other targets
+
+`bn_fit()` has two options that change the defaults, `target = "anchor"` and `shrink_k = 300`. Neither is a new default in this release. Try them only when the defaults leave a gap you can measure.
+
+`target = "virtual"` corrects every batch, the anchor included, to a virtual reference. At each SOM node the reference is the equal-weight mean of the batches' quantile curves. No batch is the fixed point; the reference is the per-node mean of the batch curves. The anchor still sets the bridges and the map. The table shows the median of M in study cells per batch. With the anchor target, b1 does not move. With the virtual target, b1 moves too.
+
+```{r virtual}
+model_virtual <- bn_fit(
+  x = cells[, c("sample_id", "CD3", "M")],
+  samples = samples,
+  population = rep("T", nrow(cells)),
+  markers = c("CD3", "M"),
+  transform = list(name = "asinh", cofactor = 5),
+  anchor = "b1",
+  grid = c(2, 1),
+  mapping_markers = "CD3",
+  seed = 1,
+  train_cells = 300,
+  rlen = 50,
+  target = "virtual"
+)
+res_virtual <- bn_apply(
+  model_virtual,
+  cells[, c("sample_id", "CD3", "M")],
+  samples,
+  rep("T", nrow(cells))
+)
+median_m <- function(value) tapply(value[study], cells$batch[study], median)
+round(rbind(
+  uncorrected = median_m(cells$M),
+  anchor = median_m(res$x$M),
+  virtual = median_m(res_virtual$x$M)
+), 2)
+```
+
+On held-out bridge wells, the virtual target lowered the mean fold score on data set A from 0.955 to 0.906 (lower in 7 of 9 pairs) and on data set B at grid 6x6 with `min_cells = 25` from 0.760 to 0.744 (7 of 9). At the default settings on data set B it did not help (0.796 and 0.798). The noise floor of these scores is unmeasured. `bn_fit_paired()` takes the same `target` argument.
+
+`shrink_k = "eb"` replaces the single pseudo-count with one per marker, estimated by empirical Bayes from how much node offsets vary beyond their sampling noise. The estimate never falls below 300. On data set A (fresh sim seeds 1008-1009) it lowered node5 RMSE by 4.9 to 6.5%, but it made confounded-expression recovery slightly worse at all three SOM seeds. On the data set B tuning round it was worse than the matching scalar value (0.0521 against 0.0444 at grid 8x8, 0.0439 against 0.0303 at grid 6x6, as |1 - recovery|, lower is better). It is an option kept for study. The default scalar 300 did better on the data set B tuning round. It cannot be combined with `target = "virtual"`.
+
 ## Save
 
 `bn_save()` stores the model with its digest; `bn_load()` refuses a file whose contents changed after saving.

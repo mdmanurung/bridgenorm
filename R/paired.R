@@ -23,6 +23,10 @@
 #' and flags them; \code{"stop"} refuses the fit.
 #'
 #' @inheritParams bn_fit
+#' @param target \code{"anchor"} corrects every batch to the anchor batch.
+#'   \code{"virtual"} replaces each anchor reference summary by its mean over
+#'   the bridged batches, so the anchor batch gets an effect too. The anchor
+#'   still sets the bridges.
 #' @return A \code{bn_model}: a list with \code{method = "paired_shift"},
 #'   \code{settings}, \code{markers}, \code{transform}, \code{anchor},
 #'   \code{effects} (one row per batch, population and marker: estimate,

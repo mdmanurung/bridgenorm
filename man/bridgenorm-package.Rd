@@ -18,6 +18,15 @@ Settings that depend on the data (anchor, SOM grid, mapping markers, seed,
 transform) have no default. The other settings default to the values
 benchmarked on the data set A and data set B data.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://mdmanurung.github.io/bridgenorm/}
+  \item \url{https://github.com/mdmanurung/bridgenorm}
+  \item Report bugs at \url{https://github.com/mdmanurung/bridgenorm/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: M. D. Manurung \email{m.d.manurung@lumc.nl}
 

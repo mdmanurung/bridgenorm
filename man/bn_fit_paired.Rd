@@ -43,11 +43,9 @@ scale \code{x} is on. It is recorded, never applied.}
 donor with the anchor raw and flags it; \code{"stop"} refuses the fit.}
 
 \item{target}{\code{"anchor"} corrects every batch to the anchor batch.
-\code{"virtual"} corrects every batch, the anchor included, to a virtual
-reference: per reference summary and per SOM node, the equal-weight mean
-over batches (for quantiles, the mean of the batches' quantile curves).
-It covers the same summaries and nodes as the anchor, which still sets
-the bridges and the map. Not combined with \code{shrink_k = "eb"}.}
+\code{"virtual"} replaces each anchor reference summary by its mean over
+the bridged batches, so the anchor batch gets an effect too. The anchor
+still sets the bridges.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}

@@ -8,43 +8,65 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", echo = FALSE, fig.width = 7, fig.height = 4.2)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", echo = FALSE, fig.width = 7, fig.height = 5)
 scores <- read.csv("compare-data/scores.csv")
 densities <- read.csv("compare-data/densities.csv")
 settings <- read.csv("compare-data/settings.csv")
-methods <- c("uncorrected", "paired", "bridgenorm", "CytoNorm", "cyCombine")
-colours <- c(uncorrected = "grey55", paired = "#0072B2", bridgenorm = "#D55E00", CytoNorm = "#56B4E9",
-  cyCombine = "#009E73")
-scenarios <- expand.grid(design = c("balanced", "confounded"), batch_effect = c("global", "state"),
-  stringsAsFactors = FALSE)[, 2:1]
-scenario_title <- function(be, de) {
-  paste0(if (be == "global") "Global shift" else "State-specific", ", ", de)
-}
+methods <- c("uncorrected", "paired", "bridgenorm", "CytoNorm", "cyCombine", "cyCombine_covar")
+labels <- c(
+  uncorrected = "uncorrected", paired = "paired shift", bridgenorm = "bridgenorm", CytoNorm = "CytoNorm",
+  cyCombine = "cyCombine", cyCombine_covar = "cyCombine\n+ covariate"
+)
+colours <- c(
+  uncorrected = "grey55", paired = "#0072B2", bridgenorm = "#D55E00", CytoNorm = "#56B4E9",
+  cyCombine = "#009E73", cyCombine_covar = "#7FCDBB"
+)
+scenarios <- expand.grid(
+  design = c("balanced", "confounded"), batch_effect = c("global", "calibrated"),
+  stringsAsFactors = FALSE
+)[, 2:1]
+scenario_title <- function(be, de) paste0(if (be == "global") "Global shift" else "Calibrated", ", ", de)
 scores$ratio <- scores$effect / scores$effect_true
-mean_of <- function(value, be, de, m) {
-  round(mean(scores[[value]][scores$batch_effect == be & scores$design == de & scores$method == m]), 3)
+pick <- function(value, be, de, m) {
+  scores[[value]][scores$batch_effect == be & scores$design == de & scores$method == m]
 }
-range_of <- function(value, be, de, m) {
-  v <- scores[[value]][scores$batch_effect == be & scores$design == de & scores$method == m]
-  paste(sprintf("%.2f", range(v)), collapse = " to ")
+mean_of <- function(value, be, de, m) sprintf("%.3f", mean(pick(value, be, de, m)))
+range_of <- function(value, be, de, m) paste(sprintf("%.2f", range(pick(value, be, de, m))), collapse = " to ")
+setting <- function(name) settings$value[settings$setting == name]
+dot_panels <- function(value, xlab, reference = NULL) {
+  op <- par(mfrow = c(2, 2), mar = c(3, 9, 2.5, 1), cex = 0.72)
+  lim <- range(c(reference, scores[[value]]))
+  for (i in seq_len(nrow(scenarios))) {
+    be <- scenarios$batch_effect[i]
+    de <- scenarios$design[i]
+    d <- scores[scores$batch_effect == be & scores$design == de, ]
+    plot(d[[value]], match(d$method, methods), xlim = lim, ylim = c(0.5, length(methods) + 0.5), yaxt = "n",
+      pch = 19, col = colours[d$method], xlab = "", ylab = "", main = scenario_title(be, de))
+    if (!is.null(reference)) abline(v = reference, lty = 2, col = "grey40")
+    axis(2, at = seq_along(methods), labels = labels[methods], las = 1)
+    means <- tapply(d[[value]], factor(d$method, levels = methods), mean)
+    segments(means, seq_along(methods) - 0.3, means, seq_along(methods) + 0.3, lwd = 2)
+    mtext(xlab, side = 1, line = 2, cex = 0.7)
+  }
+  par(op)
 }
 ```
 
-This article compares bridgenorm with two widely used batch-correction tools, [CytoNorm](https://github.com/saeyslab/CytoNorm) and [cyCombine](https://github.com/biosurf/cyCombine), on simulated data where the truth is known. The methods were run once with the script `tools/sim-compare.R` in the package repository; the article reads its saved results, so building it does not need CytoNorm or cyCombine.
+This article compares bridgenorm with two widely used batch-correction tools, [CytoNorm](https://github.com/saeyslab/CytoNorm) and [cyCombine](https://github.com/biosurf/cyCombine), on simulated data where the truth is known. The study design and the size of the batch effects are set to realistic values for a multi-batch cytometry study with bridge samples. The methods were run once with the script `tools/sim-compare.R` in the package repository; the article reads its saved results, so building it does not need CytoNorm or cyCombine.
 
 ## Simulated data
 
-Each simulated data set has four batches. Batch b1 is the anchor and carries no batch effect. Every batch holds two bridge aliquots from one reference donor and eight study samples from different donors. Cells come from four populations and are measured on six markers. Study donors differ a little in population mix and marker levels. Cases carry a known condition effect: +0.6 on marker M4 in population C.
+Each data set has `r setting("batches")` batches. The first batch is the anchor and carries no batch effect. Every batch holds `r setting("bridge aliquots per batch")` bridge aliquots of one reference donor and `r setting("study samples per batch")` study samples from different donors, with `r setting("cells per sample")` cells per sample. Cells come from `r setting("populations")` populations measured on `r setting("markers")` markers. Study donors differ in population mix and carry small marker offsets. Cases carry a known condition effect: `r setting("effect")`.
 
 Two kinds of batch effect are simulated:
 
-- **Global shift**: one shift per batch and marker, the same for every cell.
-- **State-specific shift and scale**: a shift and a stretch or compression per batch, population and marker, so the batch effect differs between cell states and changes the shape of the distributions.
+- **Global shift**: one shift per batch and marker, the same for every cell. Its size varies by marker; the median standard deviation over batches is `r setting("global shift SD per marker (median)")`.
+- **Calibrated**: the global shift plus, per batch, population and marker, a further shift (median SD `r setting("state-specific shift SD per marker (median)")`) and a stretch or compression of the distribution (median SD of the log scale factor `r setting("log scale SD per marker (median)")`). The batch effect then differs between cell states and changes the shape of the distributions.
 
 And two study designs:
 
-- **Balanced**: four cases and four controls in every batch.
-- **Confounded**: 1, 2, 6 and 7 cases in batches b1 to b4, so condition and batch overlap.
+- **Balanced**: six cases and six controls in every batch.
+- **Confounded**: from 1 to 11 cases per batch (`r setting("cases per batch (confounded)")`), so condition and batch overlap.
 
 That makes four scenarios, each simulated with three seeds.
 
@@ -54,74 +76,55 @@ knitr::kable(settings, col.names = c("Setting", "Value"))
 
 ## Methods and settings
 
-All methods use the same 5 by 5 self-organising map grid. bridgenorm and CytoNorm are fitted on the first bridge aliquot of every batch; the second aliquot is held out for scoring. cyCombine has no separate apply step; it is fitted on and corrects all cells, study samples included, as it is designed to. CytoNorm uses 10 metaclusters, because its default of 30 exceeds the 25 map nodes. The paired shift (`bn_fit_paired()`, one shift per batch and marker) is the baseline.
+All methods use the same 8 by 8 self-organising map grid; otherwise each runs with its package defaults. bridgenorm and CytoNorm are fitted on two of the three bridge aliquots of every batch; the third is held out for scoring. cyCombine has no separate apply step; it is fitted on and corrects all cells, study samples and the held-out aliquot included, as it is designed to. cyCombine runs twice: with its default of no covariate, and with the true condition (case or control) as covariate, which is what its documentation suggests when the condition is known. That second run uses labels that the bridge-based methods never see. The paired shift (`bn_fit_paired()`, one shift per batch and marker) is the baseline.
 
 ## How the methods are scored
 
-- **Held-out bridge EMD** measures how much batch effect is left. The held-out bridge aliquot is the same donor in every batch, so after a perfect correction its distributions match across batches. Per marker, the score takes the largest one-dimensional earth mover's distance between any two batches, then the median over markers. Lower is better. With 1,500 cells per aliquot, sampling noise alone keeps the score above zero; the best methods level off near 0.05.
-- **Condition effect recovery** measures whether biology survives. Per study sample, the median of M4 in population C cells is taken; the effect is the mean of cases minus the mean of controls, with no batch term. The plot shows the estimate divided by the true +0.6, so 1 means the effect is kept.
+- **Held-out bridge EMD** measures how much batch effect is left. The held-out bridge aliquot is the same donor in every batch, so after a perfect correction its distributions match across batches. Per marker, the score takes the largest one-dimensional earth mover's distance between any two of the `r setting("batches")` batches, then the median over markers. Lower is better. Sampling noise alone keeps the score above zero.
+- **Condition-effect recovery** measures whether biology survives. Per study sample, the median of the effect marker in the effect population is taken; the effect is the mean of cases minus the mean of controls, with no batch term. The figures show the estimate divided by the true effect, so 1 means the effect is kept.
 
 ## Batch effect left after correction
 
-```{r emd, fig.height = 5}
-op <- par(mfrow = c(2, 2), mar = c(3, 7.5, 2.5, 1), cex = 0.75)
-for (i in seq_len(nrow(scenarios))) {
-  be <- scenarios$batch_effect[i]
-  de <- scenarios$design[i]
-  d <- scores[scores$batch_effect == be & scores$design == de, ]
-  y <- match(d$method, methods)
-  plot(d$heldout_emd, y, xlim = c(0, max(scores$heldout_emd)), ylim = c(0.5, 5.5), yaxt = "n",
-    pch = 19, col = colours[d$method], xlab = "", ylab = "", main = scenario_title(be, de))
-  axis(2, at = seq_along(methods), labels = methods, las = 1)
-  means <- tapply(d$heldout_emd, factor(d$method, levels = methods), mean)
-  segments(means, seq_along(methods) - 0.3, means, seq_along(methods) + 0.3, lwd = 2)
-  mtext("Held-out bridge EMD (lower is better)", side = 1, line = 2, cex = 0.7)
-}
-par(op)
+```{r emd}
+dot_panels("heldout_emd", "Held-out bridge EMD (lower is better)")
 ```
 
-Points are the three simulation seeds; bars are their mean. The design (balanced or confounded) only changes the study samples, so the bridge scores repeat across the two designs.
+Points are the three simulation seeds; bars are their mean. The design changes only the study samples, so the bridge-based scores repeat across the two designs.
 
-**Global shift.** bridgenorm (`r mean_of("heldout_emd", "global", "balanced", "bridgenorm")`), the paired shift (`r mean_of("heldout_emd", "global", "balanced", "paired")`) and cyCombine (`r mean_of("heldout_emd", "global", "balanced", "cyCombine")`) bring the held-out EMD down from `r mean_of("heldout_emd", "global", "balanced", "uncorrected")` to the level where they can no longer be told apart. CytoNorm leaves more (`r mean_of("heldout_emd", "global", "balanced", "CytoNorm")`). CytoNorm clusters cells on the same markers that carry the shift, so in this simulation its clusters likely split by batch, and several of its clusters held fewer than 50 bridge cells in some batches, which CytoNorm leaves unnormalised. bridgenorm avoids the first problem by shifting cells globally before it builds its map. With more bridge cells, or with clustering markers that carry little batch effect, CytoNorm would likely do better.
+**Global shift.** CytoNorm (`r mean_of("heldout_emd", "global", "balanced", "CytoNorm")`), bridgenorm (`r mean_of("heldout_emd", "global", "balanced", "bridgenorm")`) and the paired shift (`r mean_of("heldout_emd", "global", "balanced", "paired")`) bring the held-out EMD down from `r mean_of("heldout_emd", "global", "balanced", "uncorrected")` to nearly the same level; cyCombine leaves slightly more (`r mean_of("heldout_emd", "global", "balanced", "cyCombine")`). A global shift is what the paired shift is built for, so the node-level methods gain little here.
 
-**State-specific shift and scale.** No method removes this batch effect fully. cyCombine (`r mean_of("heldout_emd", "state", "balanced", "cyCombine")`) and bridgenorm (`r mean_of("heldout_emd", "state", "balanced", "bridgenorm")`) leave the least, ahead of CytoNorm (`r mean_of("heldout_emd", "state", "balanced", "CytoNorm")`) and the paired shift (`r mean_of("heldout_emd", "state", "balanced", "paired")`). Each bridge aliquot here has only 1,500 cells, about 60 per map node. With the default `shrink_k = 300`, a node keeps only about a sixth of its own quantile curve and borrows the rest from the batch-wide curve, so much of the state-specific part is not corrected. Larger bridge samples, or a smaller `shrink_k`, give each node more weight.
+**Calibrated batch effect.** The paired shift now falls behind (`r mean_of("heldout_emd", "calibrated", "balanced", "paired")`), because one shift per batch and marker cannot follow effects that differ between cell states. CytoNorm leaves the least (`r mean_of("heldout_emd", "calibrated", "balanced", "CytoNorm")`), then bridgenorm (`r mean_of("heldout_emd", "calibrated", "balanced", "bridgenorm")`) and cyCombine (`r mean_of("heldout_emd", "calibrated", "balanced", "cyCombine")` without, `r mean_of("heldout_emd", "calibrated", "balanced", "cyCombine_covar")` with the covariate). CytoNorm and bridgenorm both learn per-cluster quantile maps from the bridge samples. bridgenorm also pulls each node's map toward the batch-wide map: with about 150 bridge cells per node here and the default `shrink_k = 300`, a node keeps about a third of its own map. That likely explains why it leaves more of the cell-state-specific effect than CytoNorm; this was not tested separately.
 
 ## Biology kept after correction
 
-```{r effect, fig.height = 5}
-op <- par(mfrow = c(2, 2), mar = c(3, 7.5, 2.5, 1), cex = 0.75)
-lim <- range(c(0.4, scores$ratio))
-for (i in seq_len(nrow(scenarios))) {
-  be <- scenarios$batch_effect[i]
-  de <- scenarios$design[i]
-  d <- scores[scores$batch_effect == be & scores$design == de, ]
-  y <- match(d$method, methods)
-  plot(d$ratio, y, xlim = lim, ylim = c(0.5, 5.5), yaxt = "n", pch = 19, col = colours[d$method],
-    xlab = "", ylab = "", main = scenario_title(be, de))
-  abline(v = 1, lty = 2, col = "grey40")
-  axis(2, at = seq_along(methods), labels = methods, las = 1)
-  mtext("Estimated / true condition effect (1 = kept)", side = 1, line = 2, cex = 0.7)
-}
-par(op)
+```{r effect}
+dot_panels("ratio", "Estimate / true effect (1 = kept)", reference = 1)
 ```
 
-**Balanced design.** All methods give estimates close to those of the uncorrected data. With condition balanced within batch, a batch effect does not bias the case–control difference much. Under the state-specific batch effect, every estimate sits above 1, uncorrected included: the batches that stretch M4 in population C also stretch the condition effect, and no method fully undoes the stretch.
+**Balanced design.** With the condition balanced within every batch, a batch effect does not bias the case-control difference much, and every method stays close to the truth.
 
-**Confounded design.** Here a batch effect left in the data biases the estimate, because cases sit mostly in some batches. Uncorrected data range from `r range_of("ratio", "global", "confounded", "uncorrected")` of the true effect under the global shift. bridgenorm stays close to the truth (`r range_of("ratio", "global", "confounded", "bridgenorm")`), as does the paired shift. cyCombine varies more (`r range_of("ratio", "global", "confounded", "cyCombine")`): it is fitted on the study samples, so part of the condition effect, which differs between batches, can be removed as batch effect. CytoNorm (`r range_of("ratio", "global", "confounded", "CytoNorm")`) varies most, in line with the batch effect it leaves. Under the state-specific batch effect, every method varies widely in the confounded design, bridgenorm included (`r range_of("ratio", "state", "confounded", "bridgenorm")`), because no method removes that batch effect fully. With three seeds per scenario, these ranges are rough.
+**Confounded design.** Here cases sit mostly in some batches, so any batch effect left in the data, or any biology removed as batch effect, biases the estimate.
+
+- Under the calibrated batch effect, the uncorrected estimate is `r range_of("ratio", "calibrated", "confounded", "uncorrected")` times the true effect. bridgenorm (`r range_of("ratio", "calibrated", "confounded", "bridgenorm")`) and CytoNorm (`r range_of("ratio", "calibrated", "confounded", "CytoNorm")`) bring it near 1; the paired shift less so (`r range_of("ratio", "calibrated", "confounded", "paired")`).
+- cyCombine without a covariate shrinks the effect (`r range_of("ratio", "global", "confounded", "cyCombine")` under the global shift, `r range_of("ratio", "calibrated", "confounded", "cyCombine")` under the calibrated one). It is fitted on the study samples, and when cases cluster in some batches, part of the case effect looks like batch effect and is removed.
+- With the true condition as covariate, cyCombine keeps the effect (`r range_of("ratio", "global", "confounded", "cyCombine_covar")` and `r range_of("ratio", "calibrated", "confounded", "cyCombine_covar")`), but only because it is told which samples are cases.
+
+Methods that learn the batch effect from bridge samples only never see the condition, so a confounded design cannot pull the condition into their correction.
 
 ## What the correction looks like
 
-The density of marker M4 in population C cells of the held-out bridge aliquot, seed 1, balanced design. After a good correction, the four batches overlap.
+The density of the effect marker in effect-population cells of the held-out bridge aliquot, seed 1, balanced design, for four of the fifteen batches. After a good correction, the batches overlap.
 
 ```{r densities, fig.height = 4.6}
-batch_colours <- c(b1 = "black", b2 = "#E69F00", b3 = "#0072B2", b4 = "#CC79A7")
-op <- par(mfrow = c(2, 5), mar = c(2.5, 2, 2.5, 0.5), cex = 0.6)
-for (be in c("global", "state")) {
+batch_colours <- c(b01 = "black", b05 = "#E69F00", b10 = "#0072B2", b15 = "#CC79A7")
+op <- par(mfrow = c(2, 6), mar = c(2.5, 1, 4, 0.5), cex = 0.55)
+x_range <- range(densities$value[densities$design == "balanced"])
+for (be in c("global", "calibrated")) {
   for (m in methods) {
     d <- densities[densities$batch_effect == be & densities$design == "balanced" & densities$method == m, ]
     dens <- lapply(split(d$value, d$batch), density)
-    plot(NULL, xlim = range(d$value), ylim = c(0, max(sapply(dens, function(x) max(x$y)))),
-      main = paste0(m, "\n", if (be == "global") "global shift" else "state-specific"), xlab = "",
+    plot(NULL, xlim = x_range, ylim = c(0, max(sapply(dens, function(x) max(x$y)))),
+      main = paste0(labels[[m]], "\n", if (be == "global") "global shift" else "calibrated"), xlab = "",
       ylab = "", yaxt = "n")
     for (b in names(dens)) lines(dens[[b]], col = batch_colours[[b]], lwd = 1.5)
   }
@@ -132,7 +135,8 @@ par(op)
 
 ## Limits of this comparison
 
-- The simulation was written by the bridgenorm author and follows bridgenorm's design: one reference donor in every batch, batch b1 free of batch effect. Its batch effects are simple shifts and linear stretches.
-- The bridge samples are small (1,500 cells per aliquot), which limits bridgenorm's node curves and CytoNorm's clusters alike. Real bridge samples are often larger.
-- Each method ran with one setting per tool. CytoNorm in particular depends on which markers it clusters on; it clustered on all six here.
-- cyCombine and bridgenorm answer different questions. cyCombine removes differences between batches of all cells; bridgenorm removes only what the bridge samples show. Which is right depends on whether biology can differ between batches.
+- The simulation was written by the bridgenorm author and follows bridgenorm's design: one reference donor in every batch, and an anchor batch without batch effect. Its batch effects are shifts and linear stretches within populations.
+- The held-out bridge score suits methods that learn from bridge samples. cyCombine is scored on cells it was fitted on, and it targets the mean of all batches rather than the bridge donor.
+- Each method ran with one setting per tool on a shared 8 by 8 grid, which is not the CytoNorm default of 15 by 15.
+- Three seeds per scenario give rough ranges, not confidence intervals.
+- cyCombine and the bridge-based methods answer different questions. cyCombine removes differences between batches of all cells; bridgenorm and CytoNorm remove only what the bridge samples show. Which is right depends on whether biology can differ between batches.

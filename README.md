@@ -6,14 +6,18 @@ Site and articles: <https://mdmanurung.github.io/bridgenorm/>
 
 The differences between bridge samples measure the technical batch effect. bridgenorm estimates the batch effect from them alone, so study samples never enter a fit and their biology cannot be removed as batch effect. Each batch is corrected toward one anchor batch. A fitted model is frozen with a digest, so it applies to new data without changing earlier corrections.
 
+![bridgenorm workflow: bridge samples in every batch, a model fitted on bridge cells only, then applied to every cell](man/figures/schematic-workflow.svg)
+
 ## Methods
 
 `bn_fit()` is the main method. It works on reference cells only, in two passes:
 
-1. A self-organising map (SOM) on the mapping markers splits cells into nodes (cell states). Each batch gets a paired shift per node, which is the mean bridge-sample difference from the anchor.
-2. A second map is fitted on the shifted cells. In each (batch, node), the batch's marker quantiles are mapped onto the anchor's. This corrects changes in the shape of a distribution, not only its location. The offset curve of a small node is shrunk toward the batch-wide curve with weight n / (n + `shrink_k`).
+1. A global paired shift places the bridge cells, and a self-organising map (SOM) on the mapping markers splits them into nodes (cell states). Each batch gets a paired shift per node: the mean over shared bridge donors of the batch-minus-anchor donor means.
+2. The global shift, map and node shifts are refitted on the pass-1 cells. In each (batch, node), the batch's marker quantiles are mapped onto the anchor's; cells without a map take the pass-2 node shift. This corrects changes in the shape of a distribution, not only its location. Every node's offset curve is shrunk toward the batch-wide curve, keeping weight n / (n + `shrink_k`), so small nodes borrow most.
 
-Only batches whose bridge donors equal the anchor's get quantile maps. A batch that shares no bridge donor with the anchor is left raw and flagged.
+![The two passes inside bn_fit(): SOM nodes and paired shifts, a refitted map, per-node quantile maps, and shrinkage of small nodes](man/figures/schematic-method.svg)
+
+Only batches whose bridge donors equal the anchor's get quantile maps; other bridged batches get node shifts only. A batch that shares no bridge donor with the anchor is left raw and flagged.
 
 Two options are off by default. Estimates at the defaults are unchanged from 0.9.0.
 

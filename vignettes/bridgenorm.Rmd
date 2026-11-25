@@ -17,6 +17,16 @@ This article corrects a small simulated data set with `bn_fit()`. Because the da
 library(bridgenorm)
 ```
 
+## How it works
+
+Every batch holds bridge samples from the same donor or donors. `bn_fit()` estimates the batch effect from bridge cells only, relative to one anchor batch, and returns a frozen model. `bn_apply()` then corrects every cell, study samples included.
+
+![](../man/figures/schematic-workflow.svg){width=100%}
+
+Inside `bn_fit()`, a global paired shift places bridge cells on a self-organising map, and a paired shift is estimated per node. The shift, map and node shifts are then refitted on the shifted cells. In each batch and node, the batch's marker quantiles are mapped onto the anchor's; each offset curve is shrunk toward the batch-wide curve, small nodes most.
+
+![](../man/figures/schematic-method.svg){width=100%}
+
 ## Simulated data
 
 Three batches each hold two bridge wells of one reference donor and two study samples. Cells fall in two cell states, A and B, separated on the mapping marker CD3. Marker M carries the batch effect. In batch b2 it is shifted and compressed; in batch b3 it is shifted and stretched; batch b1 is the anchor and has no effect. The batch effect differs between the two cell states, so one shift per batch cannot remove it.

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 425" width="980" height="425" font-family="Helvetica, Arial, sans-serif" font-size="12">
+  <title>The two passes inside bn_fit()</title>
+  <desc>Pass 1 applies a global paired shift only to place bridge cells in SOM nodes, then estimates a paired shift per node. Pass 2 refits the global shift, the map and the node shifts on the pass-1 cells. Per batch and pass-2 node, the batch's marker quantiles are mapped onto the anchor's; every offset curve is shrunk toward the batch-wide curve, most for small nodes, and re-sorted.</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+  </defs>
+  <rect width="980" height="425" fill="#ffffff"/>
+
+  <!-- Panel A: SOM nodes -->
+  <rect x="10" y="10" width="230" height="352" rx="10" fill="#fafafa" stroke="#ccc"/>
+  <text x="25" y="35" font-weight="bold" font-size="14" fill="#222">A  Pass 1: nodes</text>
+  <text x="25" y="53" fill="#555">global shift, then SOM</text>
+  <g stroke="#bbb" stroke-width="1">
+    <g fill="#ede7f6">
+      <rect x="45" y="70" width="40" height="40"/><rect x="90" y="70" width="40" height="40"/><rect x="135" y="70" width="40" height="40"/><rect x="180" y="70" width="40" height="40"/>
+      <rect x="45" y="115" width="40" height="40"/><rect x="90" y="115" width="40" height="40" fill="#c9b8e8"/><rect x="135" y="115" width="40" height="40"/><rect x="180" y="115" width="40" height="40"/>
+      <rect x="45" y="160" width="40" height="40"/><rect x="90" y="160" width="40" height="40"/><rect x="135" y="160" width="40" height="40"/><rect x="180" y="160" width="40" height="40"/>
+    </g>
+  </g>
+  <circle cx="102" cy="130" r="3" fill="#D55E00"/><circle cx="114" cy="138" r="3" fill="#D55E00"/><circle cx="106" cy="144" r="3" fill="#D55E00"/>
+  <circle cx="118" cy="126" r="3" fill="#0072B2"/><circle cx="124" cy="140" r="3" fill="#0072B2"/><circle cx="112" cy="132" r="3" fill="#0072B2"/>
+  <text x="25" y="226" fill="#333">A global paired shift only places</text>
+  <text x="25" y="242" fill="#333">cells in nodes. Per node, the shift</text>
+  <text x="25" y="258" fill="#333">is the mean over shared donors</text>
+  <text x="25" y="274" fill="#333">of (batch − anchor) donor means</text>
+  <text x="25" y="290" fill="#333">in that node.</text>
+  <circle cx="32" cy="318" r="4" fill="#D55E00"/><text x="42" y="322" fill="#555">anchor bridge cells</text>
+  <circle cx="32" cy="338" r="4" fill="#0072B2"/><text x="42" y="342" fill="#555">batch bridge cells</text>
+
+  <path d="M240,175 L258,175" stroke="#444" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Panel B: refit -->
+  <rect x="262" y="10" width="220" height="352" rx="10" fill="#fafafa" stroke="#ccc"/>
+  <text x="277" y="35" font-weight="bold" font-size="14" fill="#222">B  Pass 2: refit</text>
+  <text x="277" y="53" fill="#555">refit on the pass-1 cells</text>
+  <g stroke="#bbb" stroke-width="1" fill="#e3f2fd">
+    <rect x="295" y="70" width="40" height="40"/><rect x="340" y="70" width="40" height="40"/><rect x="385" y="70" width="40" height="40"/><rect x="430" y="70" width="40" height="40"/>
+    <rect x="295" y="115" width="40" height="40"/><rect x="340" y="115" width="40" height="40" fill="#b3d4ee"/><rect x="385" y="115" width="40" height="40"/><rect x="430" y="115" width="40" height="40"/>
+    <rect x="295" y="160" width="40" height="40"/><rect x="340" y="160" width="40" height="40"/><rect x="385" y="160" width="40" height="40"/><rect x="430" y="160" width="40" height="40"/>
+  </g>
+  <circle cx="352" cy="130" r="3" fill="#D55E00"/><circle cx="364" cy="138" r="3" fill="#0072B2"/><circle cx="358" cy="144" r="3" fill="#D55E00"/>
+  <circle cx="368" cy="126" r="3" fill="#0072B2"/><circle cx="356" cy="134" r="3" fill="#0072B2"/><circle cx="366" cy="146" r="3" fill="#D55E00"/>
+  <text x="277" y="226" fill="#333">Global shift, SOM and node</text>
+  <text x="277" y="242" fill="#333">shifts are refitted on the</text>
+  <text x="277" y="258" fill="#333">pass-1 cells, so cells of one</text>
+  <text x="277" y="274" fill="#333">state now tend to share a node.</text>
+  <text x="277" y="298" fill="#555" font-size="11">Pass-2 node shifts cover cells</text>
+  <text x="277" y="312" fill="#555" font-size="11">without a quantile map.</text>
+
+  <path d="M482,175 L500,175" stroke="#444" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Panel C: quantile map -->
+  <rect x="504" y="10" width="230" height="352" rx="10" fill="#fafafa" stroke="#ccc"/>
+  <text x="519" y="35" font-weight="bold" font-size="14" fill="#222">C  Quantile map</text>
+  <text x="519" y="53" fill="#555">per batch, pass-2 node, marker</text>
+  <line x1="534" y1="200" x2="714" y2="200" stroke="#888"/>
+  <line x1="534" y1="200" x2="534" y2="70" stroke="#888"/>
+  <text x="624" y="218" text-anchor="middle" fill="#555" font-size="11">marker value</text>
+  <text x="526" y="135" text-anchor="middle" fill="#555" font-size="11" transform="rotate(-90 526 135)">quantile</text>
+  <path d="M540,196 C 590,190 600,90 700,76" stroke="#0072B2" stroke-width="2.5" fill="none"/>
+  <path d="M540,196 C 560,190 570,90 660,76" stroke="#D55E00" stroke-width="2.5" fill="none"/>
+  <g stroke="#555" stroke-width="1.2" marker-end="url(#arr)">
+    <line x1="625" y1="160" x2="597" y2="160"/>
+    <line x1="639" y1="120" x2="608" y2="120"/>
+    <line x1="666" y1="90" x2="630" y2="90"/>
+  </g>
+  <text x="519" y="246" fill="#333">Each batch quantile moves to the</text>
+  <text x="519" y="262" fill="#333">anchor's quantile: shape changes</text>
+  <text x="519" y="278" fill="#333">are corrected, not only location.</text>
+  <text x="519" y="300" fill="#555" font-size="11">Beyond the outer quantiles: a</text>
+  <text x="519" y="314" fill="#555" font-size="11">constant shift. Applied to the</text>
+  <text x="519" y="328" fill="#555" font-size="11">pass-1 values; anchor unchanged.</text>
+
+  <path d="M734,175 L752,175" stroke="#444" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Panel D: shrinkage -->
+  <rect x="756" y="10" width="214" height="352" rx="10" fill="#fafafa" stroke="#ccc"/>
+  <text x="771" y="35" font-weight="bold" font-size="14" fill="#222">D  Shrinkage</text>
+  <text x="771" y="53" fill="#555">small nodes borrow most</text>
+  <line x1="781" y1="200" x2="951" y2="200" stroke="#888"/>
+  <line x1="781" y1="200" x2="781" y2="70" stroke="#888"/>
+  <text x="866" y="218" text-anchor="middle" fill="#555" font-size="11">quantile</text>
+  <text x="773" y="135" text-anchor="middle" fill="#555" font-size="11" transform="rotate(-90 773 135)">offset</text>
+  <path d="M786,150 C 830,150 890,140 946,135" stroke="#555" stroke-width="2" fill="none" stroke-dasharray="5,3"/>
+  <path d="M786,180 C 820,90 880,170 946,85" stroke="#9e9e9e" stroke-width="1.5" fill="none"/>
+  <path d="M786,160 C 825,128 885,152 946,118" stroke="#0072B2" stroke-width="2.5" fill="none"/>
+  <text x="771" y="236" fill="#333">The node's offset curve is</text>
+  <text x="771" y="252" fill="#333">pulled toward the batch-wide</text>
+  <text x="771" y="268" fill="#333">curve; the node keeps weight</text>
+  <text x="771" y="290" font-family="Menlo, Consolas, monospace" fill="#222">n / (n + shrink_k)</text>
+  <text x="771" y="308" fill="#555" font-size="11">then re-sorted to stay increasing</text>
+  <line x1="776" y1="326" x2="796" y2="326" stroke="#9e9e9e" stroke-width="1.5"/><text x="801" y="330" fill="#555" font-size="11">node, raw</text>
+  <line x1="866" y1="326" x2="886" y2="326" stroke="#555" stroke-width="2" stroke-dasharray="5,3"/><text x="891" y="330" fill="#555" font-size="11">batch-wide</text>
+  <line x1="776" y1="344" x2="796" y2="344" stroke="#0072B2" stroke-width="2.5"/><text x="801" y="348" fill="#555" font-size="11">node, shrunk (used)</text>
+
+  <text x="490" y="390" text-anchor="middle" fill="#444" font-size="11.5">Quantile maps need a batch's bridge donors to equal the anchor's; other bridged batches get node shifts only; a batch with no shared donor stays raw and is flagged.</text>
+  <text x="490" y="409" text-anchor="middle" fill="#444" font-size="11.5">A cell with no quantile map (fewer than min_cells bridge cells in its node) takes the pass-2 node shift, else the global shift (fallback = "global").</text>
+</svg>

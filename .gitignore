@@ -14,3 +14,7 @@ experiments/logs_tests/
 altdoc/freeze.rds
 _quarto/*
 !_quarto/_freeze/
+
+# Analysis work on private data: kept locally, never in the public package repo
+experiments/
+plans/

@@ -2,6 +2,9 @@
 
 * Docs: the virtual target's held-out gain did not hold on batch and study subsets (decision VS8); README and
   vignette now say so. `target = "anchor"` stays the default.
+* data set B tuning round (50 candidates; grid, `shrink_k`, `min_cells`, quantile knots, `train_cells`): the best
+  settings lowered sim recovery error on the search seeds (0.044 to 0.027) but not on fresh lockbox seeds (0.049
+  vs 0.048 for grid 6x6, `min_cells = 40`). Defaults are unchanged (decision NS8).
 
 # bridgenorm 0.10.0
 

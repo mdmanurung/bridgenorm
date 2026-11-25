@@ -28,6 +28,8 @@ Two options are off by default. Estimates at the defaults are unchanged from 0.9
 
 The anchor, SOM grid, mapping markers, seed and transform depend on the data and have no default. The other settings have defaults chosen by benchmarking; check them on your own data.
 
+The article [Compare with CytoNorm and cyCombine on simulated data](https://mdmanurung.github.io/bridgenorm/vignettes/compare.html) runs the three methods on simulated data with known truth.
+
 ## Install
 
 ```r

@@ -1,6 +1,5 @@
 # Two-pass node correction with per-node quantile maps: bn_fit() and its apply path.
 #
-# Ported from the tusoskill run bn_nodes_20261121, candidate c016 (decisions T1-T3).
 
 .bn_node_quantile_schema_version <- "bn_node_quantile_model/1"
 
@@ -89,9 +88,8 @@
 #'   shrinkage off. \code{"eb"} estimates one pseudo-count per marker by
 #'   empirical Bayes from how much node offsets vary beyond their sampling
 #'   noise, never below 300; the values are stored in
-#'   \code{settings$shrink_k_marker}. In round 3b it lowered node5 RMSE by
-#'   4.9-6.5\% (fresh sim seeds 1008-1009) but made confounded-expression
-#'   recovery slightly worse than 300.
+#'   \code{settings$shrink_k_marker}. It is kept for study; in benchmarks
+#'   it did not beat the scalar default.
 #' @param target \code{"anchor"} corrects every batch to the anchor batch.
 #'   \code{"virtual"} corrects every batch, the anchor included, to a virtual
 #'   reference: per reference summary and per SOM node, the equal-weight mean
@@ -102,10 +100,9 @@
 #'   \code{x}.
 #'
 #' @section Defaults:
-#' The defaults are the settings benchmarked on the data set A and data set B data
-#' (decisions T3, EX7, TR3k): \code{min_cells = 50}, \code{train_cells = 500},
-#' \code{rlen = 100}, 21 quantiles from 0.025 to 0.975, \code{shrink_k = 300}.
-#' They were tuned on data set A; check them on new data. \code{grid},
+#' The defaults come from benchmarking: \code{min_cells = 50},
+#' \code{train_cells = 500}, \code{rlen = 100}, 21 quantiles from 0.025 to
+#' 0.975, \code{shrink_k = 300}. Check them on new data. \code{grid},
 #' \code{mapping_markers}, \code{anchor} and \code{seed} have no default.
 #'
 #' @return A \code{bn_node_quantile_model}: a list with
@@ -528,7 +525,7 @@ print.bn_node_quantile_model <- function(x, ...) {
 # Key of the virtual reference's quantile tables in model$quantiles ("(virtual)\rnode"); no batch may take it.
 .bn_virtual <- "(virtual)"
 
-# Empirical-Bayes shrink_k per marker (shrink_k = "eb"; tusoskill round 3b c031, decision R3b15). The median offset
+# Empirical-Bayes shrink_k per marker (shrink_k = "eb"). The median offset
 # of a (batch, node) from its batch-wide target, d, has variance tau^2 (true node deviation) plus sampling noise
 # v = (pi/2) (s2_g / n_g + s2_a / n_a). tau^2 = mean(d^2) - mean(v), floored at 1e-6; k = (pi/2) median(s2_g) / tau^2,
 # the normal-means shrinkage weight n / (n + k). k never goes below 300, the tested floor.

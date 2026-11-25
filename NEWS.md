@@ -1,32 +1,21 @@
 # bridgenorm (development version)
 
-* Docs: the virtual target's held-out gain did not hold on batch and study subsets (decision VS8); README and
-  vignette now say so. `target = "anchor"` stays the default.
-* data set B tuning round (50 candidates; grid, `shrink_k`, `min_cells`, quantile knots, `train_cells`): the best
-  settings lowered sim recovery error on the search seeds (0.044 to 0.027) but not on fresh lockbox seeds (0.049
-  vs 0.048 for grid 6x6, `min_cells = 40`). Defaults are unchanged (decision NS8).
+* Documentation only: benchmark-specific numbers were removed from the README, vignette and help pages.
+  Defaults are unchanged; `target = "anchor"` and `shrink_k = 300` stay the defaults.
 
 # bridgenorm 0.10.0
 
-* No default changes. Estimates at the defaults (`shrink_k = 300`, `target = "anchor"`) are unchanged from 0.9.0,
-  which itself reproduces heb 0.7.1 exactly on data set A and data set B held-out wells (decision NS1r). Both additions
-  are options (decision NS4).
+* No default changes. Estimates at the defaults (`shrink_k = 300`, `target = "anchor"`) are unchanged from 0.9.0.
+  Both additions are options.
 * `bn_fit(shrink_k = "eb")` estimates one pseudo-count per marker by empirical Bayes, with a floor of 300. The
-  values are stored in `settings$shrink_k_marker`. It stays optional (tusoskill round 3b, candidate c031;
-  decision R3b15). On data set A fresh sim seeds 1008-1009 it lowered node5 RMSE by 4.9-6.5%, but confounded-expression
-  recovery distance was slightly worse at all 3 SOM seeds. On the data set B tuning round (SOM seed 473, sim seeds
-  1001-1005) it was worse than the matching scalar k: |1 - recovery| 0.0521 vs 0.0444 at grid 8x8, and 0.0439 vs
-  0.0303 at grid 6x6 (lower is better).
+  values are stored in `settings$shrink_k_marker`. It stays optional; in benchmarks it did not beat the scalar
+  default.
 * `bn_fit(target = "virtual")` and `bn_fit_paired(target = "virtual")` correct every batch, the anchor included,
   toward a virtual reference. In each SOM node the reference is the equal-weight mean of the batches' quantile
-  curves (a 1D Wasserstein barycenter; decisions VR1-VR4). The anchor still sets the bridges and the map.
+  curves (a 1D Wasserstein barycenter). The anchor still sets the bridges and the map.
   `target = "virtual"` does not take `shrink_k = "eb"`, and no batch may be named like the virtual key. In
   `bn_fit_paired()` each anchor reference summary is replaced by its mean over the bridged batches, so the anchor
   gets an effect too. `bn_apply()` reads the target from the model; models from 0.9.0 map to the anchor.
-* Held-out bridge wells for the virtual target (mean fold score, lower is better; 3 folds, SOM seeds 473-475;
-  decisions VR6r, VR7r). data set A at 0.9.0 defaults: 0.955 to 0.906, lower in 7 of 9 pairs, one well worse at 2
-  of 3 seeds. data set B at grid 6x6, `min_cells = 25`: 0.760 to 0.744, lower in 7 of 9 pairs. data set B at 0.9.0 defaults:
-  0.796 to 0.798, a wash. The noise floor is unmeasured, so `"anchor"` stays the default.
 
 # bridgenorm 0.9.0
 
@@ -52,36 +41,30 @@
 * `heb_fit_node_quantile()` builds quantile tables only for batches whose reference donors (`reference_id`) are
   exactly the anchor's. Before, every batch got tables, so an unbridged batch that pass 1 left raw was still
   quantile-mapped onto the anchor's donors, and a partly bridged batch pooled donors the anchor lacks. Such a
-  batch now takes the pass-2 node shift if bridged and stays raw if not, as the README states. Batches in the
-  data set A and data set B benchmarks all share the anchor's donors, so their results are unchanged (decision RV2).
+  batch now takes the pass-2 node shift if bridged and stays raw if not, as the README states.
 
 # heb 0.7.1
 
 * `heb_fit_node_quantile()` sorts each column of a shrunk quantile table (rearrangement; Chernozhukov,
   Fernandez-Val and Galichon 2010, Econometrica 78:1093). With `shrink_k = 300` the mix of node, anchor and
   batch-wide curves left about 0.4% of table columns non-monotone (worst step -0.037 asinh), so a few cells
-  swapped order. The fix changed no benchmark score by more than 0.0007 at SOM seeds 473-475 (tusoskill run
-  heb_round3b_20261122, candidate c016; decision R3b12). `shrink_k = 0` is unchanged.
+  swapped order. The fix changes corrected values only slightly. `shrink_k = 0` is unchanged.
 
 # heb 0.7.0
 
 * `heb_fit_node_quantile()` gains a required `shrink_k`: each non-anchor (batch, pass-2 node) offset curve
   (batch minus anchor quantiles) is pulled toward the batch-wide offset curve with weight n / (n + shrink_k),
-  n = the batch's reference cells in the node (tusoskill run heb_confounded_20261121, candidate c018;
-  decision TR3k, shrink_k = 300). `shrink_k = 0` reproduces 0.6.0. **Breaking:** calls without `shrink_k`
-  now stop. In the round 3 lockbox (sim seeds 1004-1005, SOM seeds 473-475) shrink_k = 300 lowered recovery
-  distance on every seed (-0.009 to -0.013) and RMSE to truth, with no expression harm.
+  n = the batch's reference cells in the node. `shrink_k = 0` reproduces 0.6.0. **Breaking:** calls without `shrink_k`
+  now stop. In simulation benchmarks `shrink_k = 300` lowered recovery error and RMSE to truth.
 
 # heb 0.6.0
 
-* New `heb_fit_node_quantile()`: two-pass node correction with per-node quantile maps (tusoskill run
-  heb_nodes_20261121, candidate c016; decisions T1-T3). Pass 1 is `heb_fit_nodes()`; pass 2 refits the
+* New `heb_fit_node_quantile()`: two-pass node correction with per-node quantile maps. Pass 1 is `heb_fit_nodes()`; pass 2 refits the
   map on the shifted reference cells and, in each node where a batch and the anchor both have at least
   `min_cells` reference cells pooled over wells, maps the batch's marker quantiles onto the anchor's
   (linear interpolation, a constant shift beyond the outer quantiles). Other cells take the pass-2 node
   shift. `quantile_probs` and `tail` are required, like every `heb_fit_nodes()` setting.
-  On the data set A lockbox simulation it lowered the worst-pair EMD from 0.257 to 0.198 (node-specific
-  shifts) and from 0.763 to 0.585 (smooth shifts) against the 6x6 node shift.
+  In simulation benchmarks it lowered the worst-pair EMD against the node shift.
 * `heb_integrate()` applies the new `heb_node_quantile_model`; its `actions` carry a `pass` column, and
   pass-2 rows mapped by quantiles read `apply / node_quantile`. `heb_save()` and `heb_load()` accept it.
 * `heb_fit_nodes()` and its corrections are unchanged.

@@ -61,7 +61,7 @@ bn_bridges(samples, anchor = "b1")
 
 ## Fit
 
-The model is fitted on bridge cells only. The anchor, the SOM grid, the mapping markers, the seed and the transform depend on the data and must be given. The other settings default to the values benchmarked on two spectral cytometry data sets; here the SOM training is shortened for the toy data.
+The model is fitted on bridge cells only. The anchor, the SOM grid, the mapping markers, the seed and the transform depend on the data and must be given. The other settings have benchmarked defaults; here the SOM training is shortened for the toy data.
 
 ```{r fit}
 model <- bn_fit(
@@ -154,9 +154,9 @@ round(rbind(
 ), 2)
 ```
 
-On the full held-out benchmark, the virtual target lowered the mean fold score on data set A from 0.955 to 0.906, but the gain did not hold on subsets of batches or studies: with 8 of the 11 scorable batches it scored worse on both data sets. Use it as an option, not a default. `bn_fit_paired()` takes the same `target` argument.
+Its benefit over the anchor target was not consistent across benchmarks; use it as an option, not a default. `bn_fit_paired()` takes the same `target` argument.
 
-`shrink_k = "eb"` replaces the single pseudo-count with one per marker, estimated by empirical Bayes from how much node offsets vary beyond their sampling noise. The estimate never falls below 300. On data set A (fresh sim seeds 1008-1009) it lowered node5 RMSE by 4.9 to 6.5%, but it made confounded-expression recovery slightly worse at all three SOM seeds. On the data set B tuning round it was worse than the matching scalar value (0.0521 against 0.0444 at grid 8x8, 0.0439 against 0.0303 at grid 6x6, as |1 - recovery|, lower is better). It is an option kept for study. The default scalar 300 did better on the data set B tuning round. It cannot be combined with `target = "virtual"`.
+`shrink_k = "eb"` replaces the single pseudo-count with one per marker, estimated by empirical Bayes from how much node offsets vary beyond their sampling noise. The estimate never falls below 300. It is an option kept for study; in benchmarks it did not beat the scalar default. It cannot be combined with `target = "virtual"`.
 
 ## Save
 

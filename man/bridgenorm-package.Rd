@@ -15,8 +15,8 @@ before choosing the anchor.
 }
 \details{
 Settings that depend on the data (anchor, SOM grid, mapping markers, seed,
-transform) have no default. The other settings default to the values
-benchmarked on the data set A and data set B data.
+transform) have no default. The other settings have benchmarked defaults;
+check them on new data.
 }
 \seealso{
 Useful links:

@@ -1,4 +1,4 @@
-# bn_fit(): two-pass node correction with per-node quantile maps (tusoskill c016).
+# bn_fit(): two-pass node correction with per-node quantile maps.
 
 # Toy data: anchor b1 and batch b2, two reference donors per batch plus one study sample in b2.
 # Two clusters on the mapping marker CD3 (A near 1, B near 4). In b2, marker M is a known monotone

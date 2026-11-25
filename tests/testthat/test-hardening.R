@@ -1,4 +1,4 @@
-# Failure paths found on the data set A design: one reference donor, one aliquot per batch.
+# Failure paths for a design with one reference donor and one aliquot per batch.
 
 test_that("a batch whose references all fall below min_cells counts as unbridged", {
   s <- bn_sim()

@@ -85,9 +85,8 @@ the batch-wide offset curve. Larger values borrow more; \code{0} turns
 shrinkage off. \code{"eb"} estimates one pseudo-count per marker by
 empirical Bayes from how much node offsets vary beyond their sampling
 noise, never below 300; the values are stored in
-\code{settings$shrink_k_marker}. In round 3b it lowered node5 RMSE by
-4.9-6.5\% (fresh sim seeds 1008-1009) but made confounded-expression
-recovery slightly worse than 300.}
+\code{settings$shrink_k_marker}. It is kept for study; in benchmarks
+it did not beat the scalar default.}
 
 \item{target}{\code{"anchor"} corrects every batch to the anchor batch.
 \code{"virtual"} corrects every batch, the anchor included, to a virtual
@@ -157,10 +156,9 @@ node shift.
 }
 \section{Defaults}{
 
-The defaults are the settings benchmarked on the data set A and data set B data
-(decisions T3, EX7, TR3k): \code{min_cells = 50}, \code{train_cells = 500},
-\code{rlen = 100}, 21 quantiles from 0.025 to 0.975, \code{shrink_k = 300}.
-They were tuned on data set A; check them on new data. \code{grid},
+The defaults come from benchmarking: \code{min_cells = 50},
+\code{train_cells = 500}, \code{rlen = 100}, 21 quantiles from 0.025 to
+0.975, \code{shrink_k = 300}. Check them on new data. \code{grid},
 \code{mapping_markers}, \code{anchor} and \code{seed} have no default.
 }
 

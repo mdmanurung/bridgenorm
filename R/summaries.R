@@ -137,7 +137,7 @@
 }
 
 # Targets: the donor summaries of the anchor batch, or with target = "virtual" each summary's equal-weight
-# mean over batches (decision VR3), kept where the anchor has that summary so both targets cover the same cells.
+# mean over batches, kept where the anchor has that summary so both targets cover the same cells.
 .bn_targets <- function(donor, anchor, target = "anchor") {
   anc <- donor[donor$batch == anchor, , drop = FALSE]
   if (nrow(anc) == 0) {

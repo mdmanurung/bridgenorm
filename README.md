@@ -17,29 +17,12 @@ Only batches whose bridge donors equal the anchor's get quantile maps. A batch t
 
 Two options are off by default. Estimates at the defaults are unchanged from 0.9.0.
 
-- `target = "virtual"` corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches' quantile curves. It lowered the held-out score on the full data set A data (0.955 to 0.906), but the gain did not hold on subsets: with 8 of the 11 scorable batches it was worse on every data set (+0.03 to +0.05), and leaving out one study changed its direction. The default stays `target = "anchor"`. It does not combine with `shrink_k = "eb"`.
-- `shrink_k = "eb"` estimates one pseudo-count per marker by empirical Bayes, never below 300. On data set A (fresh sim seeds 1008-1009) it lowered node5 RMSE by 4.9-6.5% but made confounded-expression recovery slightly worse. On the data set B tuning round it was worse than the matching scalar `shrink_k` (0.0521 vs 0.0444 at grid 8x8, 0.0439 vs 0.0303 at grid 6x6; |1 - recovery|, lower is better).
+- `target = "virtual"` corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches' quantile curves. Its benefit over the anchor target was not consistent across benchmarks, so the default stays `target = "anchor"`. It does not combine with `shrink_k = "eb"`.
+- `shrink_k = "eb"` estimates one pseudo-count per marker by empirical Bayes, never below 300. It is kept for study; in benchmarks it did not beat the scalar default.
 
 `bn_fit_paired()` fits the baseline: one paired shift per population and marker, with no nodes and no quantile maps. Every other model must beat it.
 
-The anchor, SOM grid, mapping markers, seed and transform depend on the data and have no default. The other settings default to the values benchmarked on two spectral cytometry data sets (data set A and data set B).
-
-## Comparison with CytoNorm and cyCombine
-
-Held-out score: the median over markers of the worst batch-pair EMD on held-out bridge wells (3 wells; lower is better).
-
-| Data set | bridgenorm | CytoNorm 2.0.10 | cyCombine 0.3.0 | Paired shift | Uncorrected |
-|---|---|---|---|---|---|
-| data set A (heb 0.7.0) | 0.954 | 1.592 | 3.533 | 2.376 | 7.307 |
-| data set B (0.9.0 defaults; grid 6x6) | 0.797; 0.766 | 0.805 | 1.134 | 1.442 | 2.454 |
-
-bridgenorm scored lowest on both data sets. On data set B its lead over CytoNorm is within the spread across wells (SD about 0.2 for both). cyCombine was fitted on the scored cells, which favours it. CytoNorm ran with its defaults (FlowSOM 15x15, 10 clusters).
-
-On the data set B confounded simulation, bridgenorm also recovered expression differences best (|1 - recovery| 0.030 at grid 6x6, 0.044 at defaults, against 0.050 for CytoNorm and 0.118 for cyCombine). These sim seeds also tuned the grid 6x6 setting, so they favour it; a rerun on unused seeds is planned. Cell RMSE to the simulated truth favours bridgenorm by design, because the truth is the anchor batch and CytoNorm targets the batch mean.
-
-The comparison used `target = "anchor"`. The virtual target has not been compared with CytoNorm or cyCombine.
-
-cyCombine's own metrics rank the methods differently. On data set A bridge cells, its EMD reduction was 0.17 for CytoNorm, 0.12 for cyCombine and 0.05 for bridgenorm (higher is better). A diagnosis of per-sample medians shows why. bridgenorm leaves the least between-batch variation on the bridge donor (5% of uncorrected, against 46% for cyCombine and 56% for CytoNorm). cyCombine removes much more between-batch variation from study samples (15% left, against 70% for bridgenorm). The bridges do not show that variation. In these data, subjects are nested in batches, so it is either biology that differs between batches or a batch effect that affects study samples but not the bridge material; the data cannot tell them apart. bridgenorm never fits on study samples, by design, so it does not remove it. All methods kept the differences between subjects within a batch.
+The anchor, SOM grid, mapping markers, seed and transform depend on the data and have no default. The other settings have defaults chosen by benchmarking; check them on your own data.
 
 ## Install
 

@@ -1,6 +1,5 @@
 # Node-level correction (internal): .bn_fit_nodes(), the pass-1 and pass-2 model of bn_fit(), and its apply path.
 #
-# Ported from experiments/data set A/27_som-grid.R (SOM grid sweep, decisions SG1-SG4, N1-N3).
 
 .bn_node_schema_version <- "bn_node_model/1"
 

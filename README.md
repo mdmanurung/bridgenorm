@@ -39,6 +39,8 @@ On the data set B confounded simulation, bridgenorm also recovered expression di
 
 The comparison used `target = "anchor"`. The virtual target has not been compared with CytoNorm or cyCombine.
 
+cyCombine's own metrics rank the methods differently. On data set A bridge cells, its EMD reduction was 0.17 for CytoNorm, 0.12 for cyCombine and 0.05 for bridgenorm (higher is better). A diagnosis of per-sample medians shows why. bridgenorm leaves the least between-batch variation on the bridge donor (5% of uncorrected, against 46% for cyCombine and 56% for CytoNorm). cyCombine removes much more between-batch variation from study samples (15% left, against 70% for bridgenorm). The bridges do not show that variation. In these data, subjects are nested in batches, so it is either biology that differs between batches or a batch effect that affects study samples but not the bridge material; the data cannot tell them apart. bridgenorm never fits on study samples, by design, so it does not remove it. All methods kept the differences between subjects within a batch.
+
 ## Install
 
 ```r

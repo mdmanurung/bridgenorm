@@ -4,7 +4,7 @@ Batch correction for cytometry from bridge samples: reference material from the 
 
 Site and articles: <https://mdmanurung.github.io/bridgenorm/>
 
-The differences between bridge samples measure the technical batch effect. bridgenorm estimates the batch effect from them alone, so study samples never enter a fit and their biology cannot be removed as batch effect. Each batch is corrected toward one anchor batch. A fitted model is frozen with a digest, so it applies to new data without changing earlier corrections.
+The differences between bridge samples measure the technical batch effect. bridgenorm estimates the batch effect from them alone: study samples never enter a fit, so a condition that is confounded with batch cannot shape the correction. Each batch is corrected toward one anchor batch, or toward the mean of a chosen set of batches. A fitted model is frozen with a digest, so it applies to new data without changing earlier corrections.
 
 ![bridgenorm workflow: bridge samples in every batch, a model fitted on bridge cells only, then applied to every cell](man/figures/schematic-workflow.svg)
 
@@ -17,11 +17,12 @@ The differences between bridge samples measure the technical batch effect. bridg
 
 ![The two passes inside bn_fit(): SOM nodes and paired shifts, a refitted map, per-node quantile maps, and shrinkage of small nodes](man/figures/schematic-method.svg)
 
-Only batches whose bridge donors equal the anchor's get quantile maps; other bridged batches get node shifts only. A batch that shares no bridge donor with the anchor is left raw and flagged.
+Only batches whose bridge donors equal the anchor's get quantile maps; other bridged batches get node shifts only, and `bn_fit()` warns which. A batch that shares no bridge donor with the anchor is left raw, and `bn_apply()` says so.
 
-Two options are off by default. Estimates at the defaults are unchanged from 0.9.0.
+Three options are off by default.
 
 - `target = "virtual"` corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches' quantile curves. Its benefit over the anchor target was not consistent across benchmarks, so the default stays `target = "anchor"`. It does not combine with `shrink_k = "eb"`.
+- `goal_batches`, with `target = "virtual"`, restricts that mean to a chosen set of batches, for example the batches of one study, like CytoNorm's goal distribution. No benchmark benefit is claimed yet.
 - `shrink_k = "eb"` estimates one pseudo-count per marker by empirical Bayes, never below 300. It is kept for study; in benchmarks it did not beat the scalar default.
 
 `bn_fit_paired()` fits the baseline: one paired shift per population and marker, with no nodes and no quantile maps. Every other model must beat it.
@@ -56,6 +57,26 @@ bn_save(model, "bn_model.rds")
 ```
 
 The grid and mapping markers above show the shape of a call; choose them for your panel. See the Get started article for a worked example.
+
+## Before you fit
+
+- `x` must already be on the transformed scale (for example asinh with your cofactor). `transform` only records the scale; nothing is transformed for you, and `bn_fit()` warns when the values look untransformed.
+- `population` sets the strata of the global pre-shift and of the fallback for cells whose node has no effect. One label for all cells is valid; coarse lineage gates made before correction also work.
+- Pick the anchor as the batch with the least noisy bridge samples; `bn_reference_noise()` reports the noise per batch.
+- Read `res$actions` after `bn_apply()`: one row per batch, node (or population) and marker, with what was done and why. `table(res$actions$batch, res$actions$reason_code)` is a quick check.
+- `bn_apply()` holds a few copies of the data in memory; plan for about 5 GB per million cells, or apply batch by batch.
+
+## Longitudinal studies
+
+- Keep the fitted model. Applying it to later batches does not change earlier corrections. Later batches get node shifts estimated against the frozen anchor, but no quantile maps, so refit on all batches for the final analysis.
+- Use one bridge lot. If the bridge material drifts over time, the drift is read as batch effect and its opposite appears as a change over time in every study sample.
+- Spread each subject's visits over batches and mix visits within batches where the design allows. Keep a batch term in downstream models; correction lowers but does not remove between-batch noise.
+
+## Limits
+
+- Benchmarked on spectral and conventional flow cytometry. Mass cytometry, with many zero values, is untested.
+- Bridge samples should come from one donor, or the same donors in the same cell shares in every batch; quantile maps pool the donors' cells.
+- Within a node, a batch effect is assumed to be a monotone change of each marker's distribution. Cells far from every node take the nearest node's correction.
 
 ## Origin
 

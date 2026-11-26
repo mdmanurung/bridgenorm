@@ -199,3 +199,9 @@ test_that("a model saved by 1.0.0 still loads, validates and applies", {
     tolerance = 1e-12
   )
 })
+
+test_that("values that look untransformed warn", {
+  d <- guard_sim()
+  d$x$M <- d$x$M * 1000
+  expect_warning(guard_fit(d), "already transformed")
+})

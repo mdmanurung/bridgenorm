@@ -65,6 +65,34 @@
   sort(goal_batches, method = "radix")
 }
 
+# Warn when marker values look untransformed: asinh-scale cytometry data rarely exceed about 20.
+.bn_warn_linear <- function(x, markers) {
+  xm <- if (is.matrix(x)) {
+    x[, markers, drop = FALSE]
+  } else {
+    as.matrix(as.data.frame(x)[markers])
+  }
+  big <- markers[
+    apply(
+      abs(xm),
+      2,
+      stats::quantile,
+      probs = 0.99,
+      names = FALSE,
+      na.rm = TRUE
+    ) >
+      100
+  ]
+  if (length(big) > 0) {
+    warning(
+      "Marker(s) ",
+      paste(utils::head(big, 5), collapse = ", "),
+      " have values above 100 in 1% of cells: is 'x' already transformed? bridgenorm does not transform it.",
+      call. = FALSE
+    )
+  }
+}
+
 # Stop unless target is "anchor" or "virtual".
 .bn_check_target <- function(target) {
   if (!identical(target, "anchor") && !identical(target, "virtual")) {

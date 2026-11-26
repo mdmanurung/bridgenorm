@@ -67,7 +67,7 @@ bn_fit_paired <- function(
   goal_batches = NULL,
   sample_ids = NULL
 ) {
-  .bn_fit_paired(
+  model <- .bn_fit_paired(
     x,
     samples,
     population,
@@ -80,6 +80,9 @@ bn_fit_paired <- function(
     goal_batches,
     sample_ids
   )
+  # After the fit, so bad inputs fail with the fit's own messages first.
+  .bn_warn_linear(x, markers)
+  model
 }
 
 # bn_fit_paired() with the rule for goal summaries the anchor has and the goal lacks: "stop" for user fits,

@@ -115,6 +115,14 @@
 #'   batch and node; the list names are internal keys), \code{software},
 #'   \code{created},
 #'   \code{parent_digest} and \code{digest}.
+#' @example inst/examples/bn-toy.R
+#' @examples
+#' model <- bn_fit(
+#'   x, samples, population = rep("T", nrow(x)), markers = c("Lin", "M"),
+#'   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
+#'   grid = c(2, 1), mapping_markers = "Lin", seed = 1, rlen = 20
+#' )
+#' model
 #' @seealso \code{\link{bn_apply}}, \code{\link{bn_fit_paired}}
 #' @export
 bn_fit <- function(
@@ -200,6 +208,7 @@ bn_fit <- function(
 
   # Reference rows only, as .bn_fit_nodes() uses.
   d <- .bn_cells(x, samples, population, markers, sample_ids)
+  .bn_warn_linear(x, markers)
   ref_rows <- which(d$cells$is_reference)
   x_ref <- x[ref_rows, , drop = FALSE]
   ids_ref <- d$cells$sample_id[ref_rows]

@@ -99,6 +99,12 @@ res <- bn_apply(model, cells[, c("sample_id", "Lin", "M")], samples, rep("T", nr
 head(res$actions)
 ```
 
+Check what was done before using the result. `actions` has one row per pass, batch, node and marker. Rows reading `abstain` kept raw values; `bn_apply()` also sends a message when a whole batch was left raw.
+
+```{r check-actions}
+table(res$actions$batch, res$actions$reason_code)
+```
+
 ## Check against the truth
 
 For study cells, the error is the distance between the corrected value of M and its value without the batch effect.
@@ -131,7 +137,7 @@ par(op)
 
 ## Two options for other targets
 
-`bn_fit()` has two options that change the defaults, `target = "anchor"` and `shrink_k = 300`. Neither is a new default in this release. Try them only when the defaults leave a gap you can measure.
+`bn_fit()` has two options that change the defaults, `target = "anchor"` and `shrink_k = 300`. Neither is a new default in this release. With `target = "virtual"`, `goal_batches` restricts the mean to a chosen set of batches, for example the batches of one study; the anchor may lie outside that set. Try them only when the defaults leave a gap you can measure.
 
 `target = "virtual"` corrects every batch, the anchor included, to a virtual reference. At each SOM node the reference is the equal-weight mean of the batches' quantile curves. No batch is the fixed point; the reference is the per-node mean of the batch curves. The anchor still sets the bridges and the map. The table shows the median of M in study cells per batch. With the anchor target, b1 does not move. With the virtual target, b1 moves too.
 

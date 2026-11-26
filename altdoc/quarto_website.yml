@@ -13,6 +13,16 @@ website:
         file: index.md
       - text: Get started
         file: vignettes/bridgenorm.Rmd
+      - text: Articles
+        menu:
+          - text: "Use case 1: Correct batches with bridge samples"
+            file: vignettes/bridgenorm.Rmd
+          - text: "Use case 2: Normalize toward a goal distribution"
+            file: vignettes/goal-distribution.Rmd
+          - text: "Use case 3: Correct later batches with a frozen model"
+            file: vignettes/frozen-model.Rmd
+          - text: "Compare with CytoNorm and cyCombine"
+            file: vignettes/compare.Rmd
       # Reference opens bn_fit(), the main function; the sidebar lists the rest.
       - text: Reference
         file: man/bn_fit.qmd

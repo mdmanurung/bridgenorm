@@ -56,7 +56,11 @@ res <- bn_apply(model, x, samples, labels)
 bn_save(model, "bn_model.rds")
 ```
 
-The grid and mapping markers above show the shape of a call; choose them for your panel. See the Get started article for a worked example.
+The grid and mapping markers above show the shape of a call; choose them for your panel. Worked examples, each on simulated data with known truth:
+
+- [Use case 1: Correct batches with bridge samples](https://mdmanurung.github.io/bridgenorm/vignettes/bridgenorm.html)
+- [Use case 2: Normalize toward a goal distribution](https://mdmanurung.github.io/bridgenorm/vignettes/goal-distribution.html)
+- [Use case 3: Correct later batches with a frozen model](https://mdmanurung.github.io/bridgenorm/vignettes/frozen-model.html)
 
 ## Before you fit
 

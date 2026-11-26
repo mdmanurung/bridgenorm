@@ -29,12 +29,12 @@ Inside `bn_fit()`, a global paired shift places bridge cells on a self-organisin
 
 ## Simulated data
 
-Three batches each hold two bridge wells of one reference donor and two study samples. Cells fall in two cell states, A and B, separated on the mapping marker CD3. Marker M carries the batch effect. In batch b2 it is shifted and compressed; in batch b3 it is shifted and stretched; batch b1 is the anchor and has no effect. The batch effect differs between the two cell states, so one shift per batch cannot remove it.
+Three batches each hold two bridge wells of one reference donor and two study samples. Cells fall in two cell states, A and B, separated on the mapping marker Lin. Marker M carries the batch effect. In batch b2 it is shifted and compressed; in batch b3 it is shifted and stretched; batch b1 is the anchor and has no effect. The batch effect differs between the two cell states, so one shift per batch cannot remove it.
 
 ```{r simulate}
 set.seed(1)
 centre <- c(A = 2, B = 1)
-cd3 <- c(A = 1, B = 4)
+lin <- c(A = 1, B = 4)
 effect <- list(
   b1 = list(shift = c(A = 0, B = 0), scale = 1),
   b2 = list(shift = c(A = 0.4, B = -0.3), scale = 0.6),
@@ -53,7 +53,7 @@ cells <- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {
     data.frame(
       sample_id = samples$sample_id[i],
       state = k,
-      CD3 = rnorm(300, cd3[[k]], 0.2),
+      Lin = rnorm(300, lin[[k]], 0.2),
       M = centre[[k]] + effect[[b]]$scale * (truth - centre[[k]]) + effect[[b]]$shift[[k]],
       truth = truth
     )
@@ -75,14 +75,14 @@ The model is fitted on bridge cells only. The anchor, the SOM grid, the mapping 
 
 ```{r fit}
 model <- bn_fit(
-  x = cells[, c("sample_id", "CD3", "M")],
+  x = cells[, c("sample_id", "Lin", "M")],
   samples = samples,
   population = rep("T", nrow(cells)),
-  markers = c("CD3", "M"),
+  markers = c("Lin", "M"),
   transform = list(name = "asinh", cofactor = 5),
   anchor = "b1",
   grid = c(2, 1),
-  mapping_markers = "CD3",
+  mapping_markers = "Lin",
   seed = 1,
   train_cells = 300, # this toy data has 600 cells per sample
   rlen = 50
@@ -95,7 +95,7 @@ model
 `bn_apply()` applies the frozen model to all cells, study samples included.
 
 ```{r integrate}
-res <- bn_apply(model, cells[, c("sample_id", "CD3", "M")], samples, rep("T", nrow(cells)))
+res <- bn_apply(model, cells[, c("sample_id", "Lin", "M")], samples, rep("T", nrow(cells)))
 head(res$actions)
 ```
 
@@ -137,14 +137,14 @@ par(op)
 
 ```{r virtual}
 model_virtual <- bn_fit(
-  x = cells[, c("sample_id", "CD3", "M")],
+  x = cells[, c("sample_id", "Lin", "M")],
   samples = samples,
   population = rep("T", nrow(cells)),
-  markers = c("CD3", "M"),
+  markers = c("Lin", "M"),
   transform = list(name = "asinh", cofactor = 5),
   anchor = "b1",
   grid = c(2, 1),
-  mapping_markers = "CD3",
+  mapping_markers = "Lin",
   seed = 1,
   train_cells = 300,
   rlen = 50,
@@ -152,7 +152,7 @@ model_virtual <- bn_fit(
 )
 res_virtual <- bn_apply(
   model_virtual,
-  cells[, c("sample_id", "CD3", "M")],
+  cells[, c("sample_id", "Lin", "M")],
   samples,
   rep("T", nrow(cells))
 )

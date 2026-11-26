@@ -44,11 +44,11 @@
 #' x <- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {
 #'   data.frame(
 #'     sample_id = samples$sample_id[i],
-#'     CD3 = rnorm(100, 2 + shift[[samples$batch[i]]], 0.3)
+#'     Lin = rnorm(100, 2 + shift[[samples$batch[i]]], 0.3)
 #'   )
 #' }))
 #' model <- bn_fit_paired(
-#'   x, samples, population = rep("T", nrow(x)), markers = "CD3",
+#'   x, samples, population = rep("T", nrow(x)), markers = "Lin",
 #'   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
 #'   min_cells = 20
 #' )

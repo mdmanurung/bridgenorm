@@ -133,10 +133,79 @@ legend("topright", legend = names(batch_colours), col = batch_colours, lwd = 1.5
 par(op)
 ```
 
+## Longitudinal study with repeated visits
+
+```{r longitudinal-setup}
+lg <- read.csv("compare-data/longitudinal.csv")
+lg$miss_t2 <- abs(1 - lg$ratio_t2)
+lg$miss_t3 <- abs(1 - lg$ratio_t3)
+lg_methods <- c("uncorrected", "paired", "bridgenorm", "CytoNorm_default", "CytoNorm_8x8")
+lg_labels <- c(
+  uncorrected = "uncorrected", paired = "paired shift", bridgenorm = "bridgenorm",
+  CytoNorm_default = "CytoNorm 15x15", CytoNorm_8x8 = "CytoNorm 8x8"
+)
+lg_colours <- c(colours[c("uncorrected", "paired", "bridgenorm")], CytoNorm_default = "#56B4E9", CytoNorm_8x8 = "#2C7FB8")
+lg_metrics <- c(
+  miss_t2 = "t2 effect error", miss_t3 = "t3 effect error", null_drift = "Drift",
+  noise_sd = "Noise SD", t_t3 = "Paired t, t3", heldout_emd = "Held-out bridge EMD"
+)
+lg_mean <- function(value, be, m) sprintf("%.3f", mean(lg[[value]][lg$batch_effect == be & lg$method == m]))
+lg_t <- function(be, m) sprintf("%.0f", mean(lg$t_t3[lg$batch_effect == be & lg$method == m]))
+# Win rule: a method wins a metric only when it is better at every seed; it loses when worse at every seed.
+lg_calls <- do.call(rbind, lapply(c("global", "calibrated"), function(be) {
+  do.call(rbind, lapply(c("CytoNorm_default", "CytoNorm_8x8"), function(cm) {
+    do.call(rbind, lapply(names(lg_metrics), function(mt) {
+      b <- lg[lg$batch_effect == be & lg$method == "bridgenorm", ]
+      o <- lg[lg$batch_effect == be & lg$method == cm, ]
+      o <- o[match(b$seed, o$seed), ]
+      better <- if (mt == "t_t3") b[[mt]] > o[[mt]] else b[[mt]] < o[[mt]]
+      data.frame(batch_effect = be, competitor = cm, metric = mt,
+        call = if (all(better)) "win" else if (!any(better)) "loss" else "tie")
+    }))
+  }))
+}))
+n_call <- function(x) sum(lg_calls$call == x)
+```
+
+Clinical studies often sample each subject at several visits, and the visits land in different batches. This section simulates that design to ask whether correction keeps a within-subject change over time. It uses the same simulator, calibration and batches as above, with a staggered design: each batch holds the first visit (t1) of a new cohort of four subjects, the second visit (t2) of the previous cohort and the third visit (t3) of the cohort before that. Thirteen cohorts give 52 subjects over the fifteen batches, so visit and batch overlap within every subject. In one population, one marker rises by 0.2 at t2 and 0.4 at t3; no other marker changes. Each subject keeps one population mix and marker offset across visits, plus small visit-to-visit noise. Both batch effects were simulated with five seeds; the script is `tools/sim-longitudinal.R`.
+
+CytoNorm runs twice here: with its default 15 by 15 grid and with the 8 by 8 grid shared by the other methods. Six scores are reported, with no single primary one:
+
+- **Effect error at t2 and t3**: the mean within-subject change of the effect marker in the effect population, divided by the true change; the score is the distance from 1.
+- **Drift on no-change markers**: the median, over the other markers, of the absolute mean change from t1 to t3. The truth is 0.
+- **Noise SD on no-change markers**: the median, over the other markers, of the standard deviation across subjects of the t1-to-t3 change. Batch effect left in the data adds to this noise.
+- **Paired t of the t3 effect**: the mean change over its standard error, a measure of how easily a study would detect the effect.
+- **Held-out bridge EMD**, as above.
+
+```{r longitudinal, fig.height = 8}
+op <- par(mfrow = c(4, 3), mar = c(3, 1, 3, 0.5), oma = c(0, 8, 0, 0), cex = 0.7)
+for (be in c("global", "calibrated")) {
+  for (mt in names(lg_metrics)) {
+    d <- lg[lg$batch_effect == be & lg$method %in% lg_methods, ]
+    plot(d[[mt]], match(d$method, lg_methods), xlim = range(lg[lg$method %in% lg_methods, mt]),
+      ylim = c(0.5, length(lg_methods) + 0.5), yaxt = "n", pch = 19, col = lg_colours[d$method], xlab = "",
+      ylab = "", main = paste0(lg_metrics[[mt]], "\n", if (be == "global") "global shift" else "calibrated"))
+    means <- tapply(d[[mt]], factor(d$method, levels = lg_methods), mean)
+    segments(means, seq_along(lg_methods) - 0.3, means, seq_along(lg_methods) + 0.3, lwd = 2)
+    if (mt %in% names(lg_metrics)[c(1, 4)]) axis(2, at = seq_along(lg_methods), labels = lg_labels[lg_methods], las = 1)
+  }
+}
+par(op)
+```
+
+Points are the five seeds; bars are their mean. Drift and noise SD are on the no-change markers. Lower is better for every score except the paired t.
+
+**The time effect survives every method, including no correction.** Each subject's visits sit in three consecutive batches, and different subjects meet different batches, so batch effects largely cancel in the mean change. Uncorrected data estimate the t3 effect at `r lg_mean("ratio_t3", "calibrated", "uncorrected")` times the truth under the calibrated batch effect.
+
+**What correction buys is precision.** Under the calibrated batch effect, the batch effect left in uncorrected data inflates the subject-to-subject noise (`r lg_mean("noise_sd", "calibrated", "uncorrected")`) and keeps the paired t at `r lg_t("calibrated", "uncorrected")`. bridgenorm cuts the noise to `r lg_mean("noise_sd", "calibrated", "bridgenorm")` and CytoNorm to `r lg_mean("noise_sd", "calibrated", "CytoNorm_default")`, raising the paired t to `r lg_t("calibrated", "bridgenorm")` and `r lg_t("calibrated", "CytoNorm_default")`. The paired shift gets part of the way (t = `r lg_t("calibrated", "paired")`).
+
+**bridgenorm and CytoNorm keep time effects about equally well, and neither wins across scores.** Counting a win only when a method is better at all five seeds, bridgenorm against the two CytoNorm settings has `r n_call("win")` wins, `r n_call("loss")` losses and `r n_call("tie")` ties over the `r nrow(lg_calls)` comparisons. bridgenorm has the lower noise under the calibrated batch effect. CytoNorm aligns the held-out bridge aliquot better under the calibrated batch effect (`r lg_mean("heldout_emd", "calibrated", "CytoNorm_default")` against `r lg_mean("heldout_emd", "calibrated", "bridgenorm")`), and its mean paired t is higher, though not at every seed. The two CytoNorm grids score almost the same. With `shrink_k = 0`, bridgenorm's paired t under the calibrated batch effect rises to `r lg_t("calibrated", "bridgenorm_k0")` and its held-out EMD falls to `r lg_mean("heldout_emd", "calibrated", "bridgenorm_k0")`, but its t3 effect error under the global shift grows from `r lg_mean("miss_t3", "global", "bridgenorm")` to `r lg_mean("miss_t3", "global", "bridgenorm_k0")`; the default stays at 300.
+
 ## Limits of this comparison
 
 - The simulation was written by the bridgenorm author and follows bridgenorm's design: one reference donor in every batch, and an anchor batch without batch effect. Its batch effects are shifts and linear stretches within populations.
 - The held-out bridge score suits methods that learn from bridge samples. cyCombine is scored on cells it was fitted on, and it targets the mean of all batches rather than the bridge donor.
 - Each method ran with one setting per tool on a shared 8 by 8 grid, which is not the CytoNorm default of 15 by 15.
 - Three seeds per scenario give rough ranges, not confidence intervals.
+- The longitudinal simulation has four subjects per cohort, one changing marker in one population, and visits in consecutive batches. Studies with visits far apart in time, or with bridge material that ages, may behave differently.
 - cyCombine and the bridge-based methods answer different questions. cyCombine removes differences between batches of all cells; bridgenorm and CytoNorm remove only what the bridge samples show. Which is right depends on whether biology can differ between batches.

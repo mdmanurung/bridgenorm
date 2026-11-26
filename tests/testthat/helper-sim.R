@@ -74,7 +74,7 @@ subset_sim <- function(s, keep) {
 TF <- list(name = "asinh", cofactor = 5)
 
 # Toy data: anchor b1 and batches b2, b3; two reference donors per batch plus one study sample in b2 and b3.
-# Cells come from two well-separated clusters on the mapping marker CD3 (A near 1, B near 4).
+# Cells come from two well-separated clusters on the mapping marker Lin (A near 1, B near 4).
 # Marker M carries a batch shift that differs by cluster: b2 A +0.5, B -0.3; b3 A +0.2, B +0.2.
 # small_b3: the b3 references have 30 cells per cluster (same cell mix, fewer cells), so with min_cells 40
 # no b3 node summary survives while the b3 global summary (60 cells) does.
@@ -87,7 +87,7 @@ nodes_sim <- function(seed = 11, small_b3 = FALSE) {
   )
   base_m <- c(A = 2, B = 1)
   donor_m <- c(D1 = 0, D2 = 0.1, S = 0)
-  centre_cd3 <- c(A = 1, B = 4)
+  centre_lin <- c(A = 1, B = 4)
   samples <- rbind(
     expand.grid(
       donor = c("D1", "D2"),
@@ -114,7 +114,7 @@ nodes_sim <- function(seed = 11, small_b3 = FALSE) {
           data.frame(
             sample_id = samples$sample_id[i],
             cluster = k,
-            CD3 = stats::rnorm(n, centre_cd3[[k]], 0.2),
+            Lin = stats::rnorm(n, centre_lin[[k]], 0.2),
             M = stats::rnorm(
               n,
               base_m[[k]] + donor_m[[d]] + shift[[b]][[k]],

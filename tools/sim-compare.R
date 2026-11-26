@@ -169,6 +169,20 @@ run_methods <- function(sim, seed) {
     seed = seed
   )
   out$bridgenorm <- as.matrix(bn_apply(model, all_x, fit_samples, population)$x[MARKERS])
+  # shrink_k = 0: the article's shrinkage sentence reads this arm.
+  model_k0 <- bn_fit(
+    x = x[is_fit_ref, c("sample_id", MARKERS)],
+    samples = fit_samples,
+    population = population[is_fit_ref],
+    markers = MARKERS,
+    transform = transform,
+    anchor = BATCHES[[1]],
+    grid = GRID,
+    mapping_markers = MARKERS,
+    seed = seed,
+    shrink_k = 0
+  )
+  out$bridgenorm_k0 <- as.matrix(bn_apply(model_k0, all_x, fit_samples, population)$x[MARKERS])
 
   to_fs <- function(ids) {
     flowCore::flowSet(lapply(setNames(ids, ids), function(id) {

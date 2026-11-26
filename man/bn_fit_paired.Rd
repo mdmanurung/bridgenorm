@@ -14,6 +14,7 @@ bn_fit_paired(
   min_cells = 50,
   unbridged = "abstain",
   target = "anchor",
+  goal_batches = NULL,
   sample_ids = NULL
 )
 }
@@ -46,6 +47,14 @@ donor with the anchor raw and flags it; \code{"stop"} refuses the fit.}
 \code{"virtual"} replaces each anchor reference summary by its mean over
 the bridged batches, so the anchor batch gets an effect too. The anchor
 still sets the bridges.}
+
+\item{goal_batches}{\code{NULL}, or with \code{target = "virtual"} two
+or more batches whose equal-weight mean is the goal (for example the
+batches of one study), as CytoNorm's goal distribution. Goal batches that
+are unbridged or whose reference donors differ from the anchor's are
+dropped. The anchor still sets the bridges and the map and may lie outside
+the goal; the fit stops when the goal lacks a reference summary the anchor
+has. Nodes without a goal quantile table take the pass-2 node shift.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}
@@ -89,11 +98,11 @@ shift <- c(b1 = 0, b2 = 0.5, b3 = -0.3)
 x <- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {
   data.frame(
     sample_id = samples$sample_id[i],
-    CD3 = rnorm(100, 2 + shift[[samples$batch[i]]], 0.3)
+    Lin = rnorm(100, 2 + shift[[samples$batch[i]]], 0.3)
   )
 }))
 model <- bn_fit_paired(
-  x, samples, population = rep("T", nrow(x)), markers = "CD3",
+  x, samples, population = rep("T", nrow(x)), markers = "Lin",
   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
   min_cells = 20
 )

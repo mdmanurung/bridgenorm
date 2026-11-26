@@ -1,0 +1,8 @@
+bibentry(
+  bibtype = "Manual",
+  title = "bridgenorm: Cytometry Batch Correction from Bridge Samples",
+  author = person("M. D.", "Manurung"),
+  year = "2026",
+  note = paste("R package version", meta$Version),
+  url = "https://github.com/mdmanurung/bridgenorm"
+)

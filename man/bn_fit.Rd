@@ -16,16 +16,13 @@ bn_fit(
   seed,
   min_cells = 50,
   unbridged = "abstain",
-  method = "paired",
-  eb_settings = NULL,
   train_cells = 500,
   rlen = 100,
-  assignment = "nearest",
   fallback = "global",
   quantile_probs = seq(0.025, 0.975, length.out = 21),
-  tail = "shift",
   shrink_k = 300,
   target = "anchor",
+  goal_batches = NULL,
   sample_ids = NULL
 )
 }
@@ -61,15 +58,9 @@ must be one of \code{markers}.}
 \item{unbridged}{\code{"abstain"} leaves a batch that shares no bridge
 donor with the anchor raw and flags it; \code{"stop"} refuses the fit.}
 
-\item{method}{Node estimator; only \code{"paired"}.}
-
-\item{eb_settings}{Only \code{NULL}; kept for future estimators.}
-
 \item{train_cells}{Maximum training cells per reference sample for the SOM.}
 
 \item{rlen}{Number of SOM training passes (\code{kohonen::som}).}
-
-\item{assignment}{How cells are assigned to nodes; only \code{"nearest"}.}
 
 \item{fallback}{For a (batch, node, marker) without a node effect:
 \code{"global"} takes the batch's global shift, \code{"abstain"} keeps
@@ -77,8 +68,6 @@ the raw value.}
 
 \item{quantile_probs}{Increasing probabilities in (0, 1), at least two,
 at which batch and anchor quantiles are matched.}
-
-\item{tail}{Rule beyond the outer quantiles; only \code{"shift"}.}
 
 \item{shrink_k}{Non-negative pseudo-count of cells for the shrinkage toward
 the batch-wide offset curve. Larger values borrow more; \code{0} turns
@@ -95,6 +84,14 @@ over batches (for quantiles, the mean of the batches' quantile curves).
 It covers the same summaries and nodes as the anchor, which still sets
 the bridges and the map. Not combined with \code{shrink_k = "eb"}.}
 
+\item{goal_batches}{\code{NULL}, or with \code{target = "virtual"} two
+or more batches whose equal-weight mean is the goal (for example the
+batches of one study), as CytoNorm's goal distribution. Goal batches that
+are unbridged or whose reference donors differ from the anchor's are
+dropped. The anchor still sets the bridges and the map and may lie outside
+the goal; the fit stops when the goal lacks a reference summary the anchor
+has. Nodes without a goal quantile table take the pass-2 node shift.}
+
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}
 }
@@ -103,7 +100,8 @@ A \code{bn_node_quantile_model}: a list with
   \code{schema_version}, \code{settings}, \code{markers},
   \code{transform}, \code{anchor}, \code{pass1} and \code{pass2} (frozen
   node models), \code{quantiles} (one probabilities-by-markers matrix per
-  "batch\\rnode"), \code{software}, \code{created},
+  batch and node; the list names are internal keys), \code{software},
+  \code{created},
   \code{parent_digest} and \code{digest}.
 }
 \description{
@@ -162,6 +160,32 @@ The defaults come from benchmarking: \code{min_cells = 50},
 \code{mapping_markers}, \code{anchor} and \code{seed} have no default.
 }
 
+\examples{
+# Two batches, each with two bridge wells of one reference donor and one
+# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two
+# cell states.
+set.seed(1)
+samples <- data.frame(
+  sample_id = c("r1_b1", "r2_b1", "s_b1", "r1_b2", "r2_b2", "s_b2"),
+  batch = rep(c("b1", "b2"), each = 3),
+  reference_id = rep(c("donor", "donor", NA), 2),
+  aliquot = rep(c("a1", "a2", NA), 2)
+)
+x <- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {
+  shift <- if (samples$batch[i] == "b2") 0.5 else 0
+  data.frame(
+    sample_id = samples$sample_id[i],
+    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),
+    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift
+  )
+}))
+model <- bn_fit(
+  x, samples, population = rep("T", nrow(x)), markers = c("Lin", "M"),
+  transform = list(name = "asinh", cofactor = 5), anchor = "b1",
+  grid = c(2, 1), mapping_markers = "Lin", seed = 1, rlen = 20
+)
+model
+}
 \seealso{
 \code{\link{bn_apply}}, \code{\link{bn_fit_paired}}
 }

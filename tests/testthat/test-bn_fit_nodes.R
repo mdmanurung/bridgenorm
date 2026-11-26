@@ -3,10 +3,10 @@
 fit_nodes_sim <- function(s, ...) {
   args <- utils::modifyList(
     list(
-      x = s$x[, c("sample_id", "CD3", "M")],
+      x = s$x[, c("sample_id", "Lin", "M")],
       samples = s$samples,
       population = rep("T", nrow(s$x)),
-      markers = c("CD3", "M"),
+      markers = c("Lin", "M"),
       transform = list(name = "asinh", cofactor = 5),
       anchor = "b1",
       min_cells = 20,
@@ -14,7 +14,7 @@ fit_nodes_sim <- function(s, ...) {
       method = "paired",
       eb_settings = NULL,
       grid = c(2, 1),
-      mapping_markers = "CD3",
+      mapping_markers = "Lin",
       train_cells = 200,
       rlen = 50,
       seed = 473,
@@ -29,7 +29,7 @@ fit_nodes_sim <- function(s, ...) {
 integrate_nodes_sim <- function(model, s) {
   bn_apply(
     model,
-    s$x[, c("sample_id", "CD3", "M")],
+    s$x[, c("sample_id", "Lin", "M")],
     s$samples,
     population = rep("T", nrow(s$x)),
     transform = list(name = "asinh", cofactor = 5),
@@ -56,13 +56,13 @@ test_that("paired node model recovers planted per-cluster shifts", {
   expect_equal(m$x, expected, tolerance = 0.03, ignore_attr = TRUE)
 })
 
-test_that("the global CD3+ model cannot recover cluster-specific shifts (control)", {
+test_that("the global Lin+ model cannot recover cluster-specific shifts (control)", {
   s <- nodes_sim()
   global <- bn_fit_paired(
-    s$x[, c("sample_id", "CD3", "M")],
+    s$x[, c("sample_id", "Lin", "M")],
     s$samples,
     population = rep("T", nrow(s$x)),
-    markers = c("CD3", "M"),
+    markers = c("Lin", "M"),
     transform = list(name = "asinh", cofactor = 5),
     anchor = "b1",
     min_cells = 20,
@@ -70,7 +70,7 @@ test_that("the global CD3+ model cannot recover cluster-specific shifts (control
   )
   res <- bn_apply(
     global,
-    s$x[, c("sample_id", "CD3", "M")],
+    s$x[, c("sample_id", "Lin", "M")],
     s$samples,
     population = rep("T", nrow(s$x)),
     transform = list(name = "asinh", cofactor = 5),
@@ -130,10 +130,10 @@ test_that("one seed gives the same map; the seed is required", {
   s <- nodes_sim()
   expect_identical(fit_nodes_sim(s)$map, fit_nodes_sim(s)$map)
   args <- list(
-    x = s$x[, c("sample_id", "CD3", "M")],
+    x = s$x[, c("sample_id", "Lin", "M")],
     samples = s$samples,
     population = rep("T", nrow(s$x)),
-    markers = c("CD3", "M"),
+    markers = c("Lin", "M"),
     transform = list(name = "asinh", cofactor = 5),
     anchor = "b1",
     min_cells = 20,
@@ -141,7 +141,7 @@ test_that("one seed gives the same map; the seed is required", {
     method = "paired",
     eb_settings = NULL,
     grid = c(2, 1),
-    mapping_markers = "CD3",
+    mapping_markers = "Lin",
     train_cells = 200,
     rlen = 50,
     assignment = "nearest",
@@ -166,13 +166,13 @@ test_that("a node model survives bn_save and bn_load", {
   expect_error(bn_save(tampered, path), "Digest mismatch")
 })
 
-# Review fixes for 0.5.1 (plans/2026-11-21_heb-0.5.1-fixes.md) -----------------
+# Review fixes for 0.5.1 --------------------------------------------------------
 
 test_that("mapping markers outside the corrected markers are refused", {
   skip_if_not_installed("kohonen")
   s <- nodes_sim()
   expect_error(
-    fit_nodes_sim(s, markers = "M", mapping_markers = "CD3"),
+    fit_nodes_sim(s, markers = "M", mapping_markers = "Lin"),
     "mapping_markers"
   )
 })
@@ -202,7 +202,7 @@ test_that("a node row reads 'apply' only when every cell in it got the global ef
   model <- fit_nodes_sim(s, population = pop, min_cells = 25)
   res <- bn_apply(
     model,
-    s$x[, c("sample_id", "CD3", "M")],
+    s$x[, c("sample_id", "Lin", "M")],
     s$samples,
     population = pop,
     transform = list(name = "asinh", cofactor = 5),
@@ -223,7 +223,7 @@ test_that("a node row reads 'apply' only when every cell in it got the global ef
   expect_error(
     bn_apply(
       model,
-      s$x[, c("sample_id", "CD3", "M")],
+      s$x[, c("sample_id", "Lin", "M")],
       s$samples,
       population = pop,
       transform = list(name = "asinh", cofactor = 5),

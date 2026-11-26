@@ -1,7 +1,7 @@
 # Two-pass node correction with per-node quantile maps: bn_fit() and its apply path.
 #
 
-.bn_node_quantile_schema_version <- "bn_node_quantile_model/1"
+.bn_node_quantile_schema_version <- "bn_node_quantile_model/2"
 
 #' Fit a two-pass node model with per-node quantile maps
 #'
@@ -72,17 +72,13 @@
 #'   (batch, node) quantile table.
 #' @param unbridged \code{"abstain"} leaves a batch that shares no bridge
 #'   donor with the anchor raw and flags it; \code{"stop"} refuses the fit.
-#' @param method Node estimator; only \code{"paired"}.
-#' @param eb_settings Only \code{NULL}; kept for future estimators.
 #' @param train_cells Maximum training cells per reference sample for the SOM.
 #' @param rlen Number of SOM training passes (\code{kohonen::som}).
-#' @param assignment How cells are assigned to nodes; only \code{"nearest"}.
 #' @param fallback For a (batch, node, marker) without a node effect:
 #'   \code{"global"} takes the batch's global shift, \code{"abstain"} keeps
 #'   the raw value.
 #' @param quantile_probs Increasing probabilities in (0, 1), at least two,
 #'   at which batch and anchor quantiles are matched.
-#' @param tail Rule beyond the outer quantiles; only \code{"shift"}.
 #' @param shrink_k Non-negative pseudo-count of cells for the shrinkage toward
 #'   the batch-wide offset curve. Larger values borrow more; \code{0} turns
 #'   shrinkage off. \code{"eb"} estimates one pseudo-count per marker by
@@ -96,6 +92,13 @@
 #'   over batches (for quantiles, the mean of the batches' quantile curves).
 #'   It covers the same summaries and nodes as the anchor, which still sets
 #'   the bridges and the map. Not combined with \code{shrink_k = "eb"}.
+#' @param goal_batches \code{NULL}, or with \code{target = "virtual"} two
+#'   or more batches whose equal-weight mean is the goal (for example the
+#'   batches of one study), as CytoNorm's goal distribution. Goal batches that
+#'   are unbridged or whose reference donors differ from the anchor's are
+#'   dropped. The anchor still sets the bridges and the map and may lie outside
+#'   the goal; the fit stops when the goal lacks a reference summary the anchor
+#'   has. Nodes without a goal quantile table take the pass-2 node shift.
 #' @param sample_ids Optional sample id per row; required for a matrix
 #'   \code{x}.
 #'
@@ -109,8 +112,17 @@
 #'   \code{schema_version}, \code{settings}, \code{markers},
 #'   \code{transform}, \code{anchor}, \code{pass1} and \code{pass2} (frozen
 #'   node models), \code{quantiles} (one probabilities-by-markers matrix per
-#'   "batch\\rnode"), \code{software}, \code{created},
+#'   batch and node; the list names are internal keys), \code{software},
+#'   \code{created},
 #'   \code{parent_digest} and \code{digest}.
+#' @example inst/examples/bn-toy.R
+#' @examples
+#' model <- bn_fit(
+#'   x, samples, population = rep("T", nrow(x)), markers = c("Lin", "M"),
+#'   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
+#'   grid = c(2, 1), mapping_markers = "Lin", seed = 1, rlen = 20
+#' )
+#' model
 #' @seealso \code{\link{bn_apply}}, \code{\link{bn_fit_paired}}
 #' @export
 bn_fit <- function(
@@ -125,16 +137,13 @@ bn_fit <- function(
   seed,
   min_cells = 50,
   unbridged = "abstain",
-  method = "paired",
-  eb_settings = NULL,
   train_cells = 500,
   rlen = 100,
-  assignment = "nearest",
   fallback = "global",
   quantile_probs = seq(0.025, 0.975, length.out = 21),
-  tail = "shift",
   shrink_k = 300,
   target = "anchor",
+  goal_batches = NULL,
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
@@ -148,7 +157,6 @@ bn_fit <- function(
     mapping_markers = missing(mapping_markers),
     seed = missing(seed)
   ))
-  .bn_check_choice(tail, "tail", "shift", what = "bn_fit")
   if (
     !is.numeric(quantile_probs) ||
       length(quantile_probs) < 2 ||
@@ -170,7 +178,21 @@ bn_fit <- function(
   ) {
     stop("'shrink_k' must be one finite number >= 0, or \"eb\".", call. = FALSE)
   }
+  .bn_check_choice(
+    unbridged,
+    "unbridged",
+    c("stop", "abstain"),
+    what = "bn_fit"
+  )
+  .bn_check_choice(
+    fallback,
+    "fallback",
+    c("global", "abstain"),
+    what = "bn_fit"
+  )
   .bn_check_target(target)
+  samples <- .bn_check_samples(samples)
+  goal_batches <- .bn_check_goal_batches(goal_batches, target, samples)
   if (target == "virtual" && identical(shrink_k, "eb")) {
     stop("target = \"virtual\" does not take shrink_k = \"eb\".", call. = FALSE)
   }
@@ -186,6 +208,7 @@ bn_fit <- function(
 
   # Reference rows only, as .bn_fit_nodes() uses.
   d <- .bn_cells(x, samples, population, markers, sample_ids)
+  .bn_warn_linear(x, markers)
   ref_rows <- which(d$cells$is_reference)
   x_ref <- x[ref_rows, , drop = FALSE]
   ids_ref <- d$cells$sample_id[ref_rows]
@@ -200,21 +223,22 @@ bn_fit <- function(
       anchor = anchor,
       min_cells = min_cells,
       unbridged = unbridged,
-      method = method,
-      eb_settings = eb_settings,
+      method = "paired",
+      eb_settings = NULL,
       grid = grid,
       mapping_markers = mapping_markers,
       train_cells = train_cells,
       rlen = rlen,
       seed = seed,
-      assignment = assignment,
+      assignment = "nearest",
       fallback = fallback,
       sample_ids = ids_ref,
-      target = target
+      target = target,
+      goal_batches = goal_batches
     )
   }
   integrate_pass <- function(m, xp) {
-    bn_apply(
+    .bn_apply(
       m,
       xp,
       samples,
@@ -240,10 +264,19 @@ bn_fit <- function(
   n_cells <- lengths(groups)
   # A quantile map matches pooled reference distributions, so only batches whose reference donors are exactly
   # the anchor's get tables; an unbridged or partly bridged batch keeps the pass-2 shift (heb 0.7.2).
+  # Donors count only through aliquots with at least min_cells cells, the gate the shift passes use.
   ref_cells <- d$cells[ref_rows, ]
-  donors <- lapply(split(ref_cells$reference_id, ref_cells$batch), \(r) {
-    sort(unique(r))
-  })
+  aliquot_key <- paste(ref_cells$batch, ref_cells$aliquot, sep = "\r")
+  big <- aliquot_key %in% names(which(table(aliquot_key) >= min_cells))
+  donors <- lapply(
+    split(
+      ref_cells$reference_id[big],
+      factor(ref_cells$batch[big], levels = unique(ref_cells$batch))
+    ),
+    \(r) {
+      sort(unique(r), method = "radix")
+    }
+  )
   same_donors <- names(donors)[vapply(
     donors,
     identical,
@@ -253,6 +286,39 @@ bn_fit <- function(
   groups <- groups[
     n_cells >= min_cells & sub("\r.*", "", names(groups)) %in% same_donors
   ]
+  no_tables <- setdiff(unique(d$cells$batch), c(same_donors, anchor))
+  if (length(no_tables) > 0) {
+    warning(
+      sprintf(
+        "No quantile maps for batch(es) %s: their reference donors passing min_cells differ from the anchor's (%s). They get node shifts only, or stay raw if unbridged; see the fit's actions.",
+        paste(no_tables, collapse = ", "),
+        paste(donors[[anchor]], collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  # Pooled tables weight donors by their cell counts; unequal shares between a batch and the anchor bias the
+  # map (documented limit).
+  if (length(donors[[anchor]]) > 1) {
+    share <- prop.table(
+      table(ref_cells$batch[big], ref_cells$reference_id[big]),
+      1
+    )
+    off <- same_donors[vapply(
+      same_donors,
+      \(b) max(abs(share[b, ] - share[anchor, ])) > 0.1,
+      logical(1)
+    )]
+    if (length(off) > 0) {
+      warning(
+        sprintf(
+          "Bridge donors' cell shares differ from the anchor's by more than 10 percentage points in batch(es) %s. Quantile maps pool donors, so unequal shares bias the correction.",
+          paste(off, collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+  }
   q_table <- function(i) {
     q <- apply(
       x1m[i, , drop = FALSE],
@@ -276,12 +342,26 @@ bn_fit <- function(
     names(quantiles)
   )
   if (target == "virtual") {
-    by_node <- split(covered, node_of(covered))
+    # The goal: all batches with the anchor's donors, or the given goal batches among them (others dropped).
+    goal_used <- if (is.null(goal_batches)) {
+      same_donors
+    } else {
+      intersect(goal_batches, same_donors)
+    }
+    if (length(goal_used) == 0) {
+      stop(
+        "No goal batch has the anchor's reference donors after min_cells, so there is no goal to map to.",
+        call. = FALSE
+      )
+    }
+    goal_tables <- covered[sub("\r.*", "", covered) %in% goal_used]
+    by_node <- split(goal_tables, node_of(goal_tables))
     target_q <- lapply(by_node, \(gs) Reduce(`+`, quantiles[gs]) / length(gs))
     names(target_q) <- paste(.bn_virtual, names(by_node), sep = "\r")
-    target_batch_q <- Reduce(`+`, batch_q[same_donors]) / length(same_donors)
+    target_batch_q <- Reduce(`+`, batch_q[goal_used]) / length(goal_used)
     target_key <- \(g) paste(.bn_virtual, node_of(g), sep = "\r")
-    todo <- covered
+    # Nodes without a goal table take the pass-2 node shift.
+    todo <- covered[node_of(covered) %in% names(by_node)]
   } else {
     target_q <- quantiles
     target_batch_q <- batch_q[[anchor]]
@@ -334,7 +414,7 @@ bn_fit <- function(
       schema_version = .bn_node_quantile_schema_version,
       settings = list(
         quantile_probs = quantile_probs,
-        tail = tail,
+        tail = "shift",
         min_cells = min_cells,
         quantile_type = 7L,
         shrink_k = shrink_k,
@@ -352,8 +432,10 @@ bn_fit <- function(
       parent_digest = NA_character_,
       digest = NA_character_
     ),
-    class = "bn_node_quantile_model"
+    class = c("bn_node_quantile_model", "bn_model")
   )
+  # Stored only when given, so fits without a goal keep their 1.0.0 layout and digest.
+  model$settings$goal_batches <- goal_batches
   model$digest <- .bn_digest(model)
   model
 }
@@ -405,7 +487,7 @@ bn_fit <- function(
   .bn_validate_node_quantile(model)
   d <- .bn_cells(x, samples, population, model$markers, sample_ids)
   ids <- d$cells$sample_id
-  r1 <- bn_apply(
+  r1 <- .bn_apply(
     model$pass1,
     x,
     samples,
@@ -414,7 +496,7 @@ bn_fit <- function(
     "abstain",
     sample_ids = ids
   )
-  r2 <- bn_apply(
+  r2 <- .bn_apply(
     model$pass2,
     r1$x,
     samples,
@@ -435,6 +517,7 @@ bn_fit <- function(
   }
   key <- paste(d$cells$batch, r2$nodes, sep = "\r")
   mapped_keys <- character(0)
+  tied <- list()
   for (g in intersect(unique(key), names(model$quantiles))) {
     qa <- model$quantiles[[paste(target, sub(".*\r", "", g), sep = "\r")]]
     if (is.null(qa)) {
@@ -443,6 +526,11 @@ bn_fit <- function(
     qb <- model$quantiles[[g]]
     i <- which(key == g)
     for (m in model$markers) {
+      # A marker with one value in the batch's quantile table has no map; it keeps the pass-2 node shift.
+      if (length(unique(qb[, m])) < 2) {
+        tied[[g]] <- c(tied[[g]], m)
+        next
+      }
       vi <- v[i, m]
       res <- stats::approx(qb[, m], qa[, m], xout = vi, ties = mean, rule = 2)$y
       low <- vi < qb[1, m]
@@ -459,12 +547,23 @@ bn_fit <- function(
   a1$pass <- 1L
   a2 <- r2$actions
   a2$pass <- 2L
-  q_row <- paste(a2$batch, a2$population, sep = "\r") %in% mapped_keys
+  a2_key <- paste(a2$batch, a2$node, sep = "\r")
+  # Tied rows (one quantile value) keep the pass-2 node shift and its action.
+  t_row <- vapply(
+    seq_along(a2_key),
+    function(r) a2$marker[[r]] %in% tied[[a2_key[[r]]]],
+    logical(1)
+  )
+  q_row <- a2_key %in% mapped_keys & !t_row
   a2$action[q_row] <- "apply"
   a2$reason_code[q_row] <- "node_quantile"
   a2$reason[
     q_row
   ] <- "Batch and anchor quantiles in this node; the quantile map was applied."
+  a2$reason_code[t_row] <- "node_quantile_tied"
+  a2$reason[
+    t_row
+  ] <- "One value in this batch's quantiles for this node and marker; the node shift was kept."
   actions <- rbind(a1, a2)
 
   # Keep the pass models as bn_apply() returned them: they carry effects of new batches.
@@ -484,7 +583,7 @@ bn_fit <- function(
         nrow(ab),
         ab$pass[1],
         ab$batch[1],
-        ab$population[1],
+        ab$node[1],
         ab$marker[1],
         ab$reason[1]
       ),

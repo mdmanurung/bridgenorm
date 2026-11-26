@@ -41,9 +41,53 @@
 #'   \code{model} (the input model, or a copy extended with new-batch
 #'   effects, with a new digest and \code{parent_digest}), \code{excluded}
 #'   and \code{aliquot_source}.
+#' @example inst/examples/bn-toy.R
+#' @examples
+#' model <- bn_fit(
+#'   x, samples, population = rep("T", nrow(x)), markers = c("Lin", "M"),
+#'   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
+#'   grid = c(2, 1), mapping_markers = "Lin", seed = 1, rlen = 20
+#' )
+#' res <- bn_apply(model, x, samples, rep("T", nrow(x)))
+#' res
+#' # Mean of M in the study samples per batch, before and after.
+#' tapply(x$M[startsWith(x$sample_id, "s")], x$sample_id[startsWith(x$sample_id, "s")], mean)
+#' tapply(res$x$M[startsWith(x$sample_id, "s")], x$sample_id[startsWith(x$sample_id, "s")], mean)
 #' @seealso \code{\link{bn_fit}}
 #' @export
 bn_apply <- function(
+  model,
+  x,
+  samples,
+  population,
+  transform = model$transform,
+  unsupported = "abstain",
+  sample_ids = NULL
+) {
+  res <- .bn_apply(
+    model,
+    x,
+    samples,
+    population,
+    transform,
+    unsupported,
+    sample_ids
+  )
+  # Say once which batches were left entirely raw: actions and print() alone are easy to miss.
+  raw <- tapply(res$actions$action == "abstain", res$actions$batch, all)
+  raw <- names(raw)[raw]
+  if (length(raw) > 0) {
+    message(
+      "bn_apply(): no correction applied to batch(es) ",
+      paste(raw, collapse = ", "),
+      "; their values are unchanged. See result$actions$reason."
+    )
+  }
+  res
+}
+
+# bn_apply() without the user-facing message; the fit passes and component models call this.
+.bn_apply <- function(
   model,
   x,
   samples,
@@ -112,7 +156,10 @@ bn_apply <- function(
   d <- .bn_cells(x, samples, population, model$markers, sample_ids)
 
   # Only batches the model has never seen may get new effects.
-  new_batches <- setdiff(sort(unique(d$cells$batch)), model$known_batches)
+  new_batches <- setdiff(
+    sort(unique(d$cells$batch), method = "radix"),
+    model$known_batches
+  )
   new_eff <- .bn_empty_effects()
   new_exc <- .bn_empty_excluded()
   if (length(new_batches) > 0) {
@@ -138,9 +185,12 @@ bn_apply <- function(
   # Extend a copy; the input model and its effects stay as they were.
   updated <- model
   if (nrow(new_eff) > 0) {
-    added <- sort(unique(new_eff$batch))
+    added <- sort(unique(new_eff$batch), method = "radix")
     updated$effects <- dplyr::bind_rows(model$effects, new_eff)
-    updated$known_batches <- sort(c(model$known_batches, added))
+    updated$known_batches <- sort(
+      c(model$known_batches, added),
+      method = "radix"
+    )
     updated$excluded <- dplyr::bind_rows(
       model$excluded,
       new_exc[new_exc$batch %in% added, , drop = FALSE]

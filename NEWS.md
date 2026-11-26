@@ -1,7 +1,44 @@
-# bridgenorm (development version)
+# bridgenorm 1.0.0
 
-* Documentation only: benchmark-specific numbers were removed from the README, vignette and help pages.
-  Defaults are unchanged; `target = "anchor"` and `shrink_k = 300` stay the defaults.
+The model contract is now stable: exported functions, model classes, schema strings and the columns of
+`actions` change only with a major version.
+
+## Breaking changes
+
+* Models saved by 0.x do not load; refit them. Schema strings are now `bn_node_quantile_model/2`,
+  `bn_node_model/2` and `bn_paired_model/2`.
+* Every model has the parent class `bn_model`. `bn_fit_paired()` returns class
+  `c("bn_paired_model", "bn_model")` (was `bn_model`).
+* `bn_fit()` drops the single-valued arguments `method`, `eb_settings`, `assignment` and `tail`. Their values
+  are fixed and still recorded in `settings`.
+* In the `actions` of a `bn_fit()` result, the SOM node column is `node` (was `population`).
+* Dead fields are removed: `hierarchy` from paired models, the duplicate `global` model from node models,
+  `eb_settings` and `assignment` from node settings.
+* `seed` must be a whole number. `kohonen` moves from Suggests to Imports.
+
+## New
+
+* `goal_batches`: with `target = "virtual"`, `bn_fit()` and `bn_fit_paired()` map every batch toward the
+  equal-weight mean of a chosen set of batches, for example the batches of one study, as CytoNorm's goal
+  distribution. Unbridged or donor-mismatched goal batches are dropped; a goal lacking a reference summary the
+  anchor has stops the fit. No benchmark benefit is claimed yet.
+* `bn_fit()` warns when a batch gets no quantile maps (donors that pass `min_cells` differ from the anchor's)
+  and when bridge donors' cell shares differ from the anchor's by more than 10 percentage points.
+* `bn_apply()` sends a message naming batches it left entirely raw.
+
+## Fixes
+
+* `bn_apply()` no longer stops when a marker has one value in a node's quantile table: that marker keeps the
+  pass-2 node shift (reason code `node_quantile_tied`).
+* An empty or blank `sample_id`, `batch`, `reference_id` or `aliquot`, and carriage returns in ids or
+  population labels, now stop with the samples named. Before, `""` silently made study samples a bridge donor.
+* Quantile tables are built only for batches whose aliquots pass `min_cells`, the gate the shift passes use.
+* The fit no longer depends on the collation locale or on the session's RNG kind. Results on data whose ids
+  sort the same in every locale are unchanged.
+* The digest leaves out timestamps and hashes a canonical form, so two fits on the same data have the same
+  digest.
+* `bn_reference_noise()` takes `transform` as optional. Choice errors name the function the user called.
+  `bn_load()` checks that the file exists.
 
 # bridgenorm 0.10.0
 

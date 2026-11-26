@@ -23,7 +23,7 @@
   if (!is.character(value) || length(value) != 1 || !value %in% choices) {
     stop(
       sprintf(
-        "%s needs %s = %s (no default).",
+        "%s needs %s = %s.",
         what,
         name,
         paste0("'", choices, "'", collapse = " or ")
@@ -32,6 +32,65 @@
     )
   }
   value
+}
+
+# Stop unless goal_batches is NULL or two or more distinct batches of 'samples', with target = "virtual".
+.bn_check_goal_batches <- function(goal_batches, target, samples) {
+  if (is.null(goal_batches)) {
+    return(NULL)
+  }
+  if (!identical(target, "virtual")) {
+    stop("'goal_batches' needs target = \"virtual\".", call. = FALSE)
+  }
+  if (
+    !is.character(goal_batches) ||
+      length(goal_batches) < 2 ||
+      anyNA(goal_batches) ||
+      anyDuplicated(goal_batches) > 0
+  ) {
+    stop(
+      "'goal_batches' must be two or more distinct batch names; for one batch use target = \"anchor\".",
+      call. = FALSE
+    )
+  }
+  absent <- setdiff(goal_batches, as.character(samples$batch))
+  if (length(absent) > 0) {
+    stop(
+      "'goal_batches' not in 'samples': ",
+      paste(absent, collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+  sort(goal_batches, method = "radix")
+}
+
+# Warn when marker values look untransformed: asinh-scale cytometry data rarely exceed about 20.
+.bn_warn_linear <- function(x, markers) {
+  xm <- if (is.matrix(x)) {
+    x[, markers, drop = FALSE]
+  } else {
+    as.matrix(as.data.frame(x)[markers])
+  }
+  big <- markers[
+    apply(
+      abs(xm),
+      2,
+      stats::quantile,
+      probs = 0.99,
+      names = FALSE,
+      na.rm = TRUE
+    ) >
+      100
+  ]
+  if (length(big) > 0) {
+    warning(
+      "Marker(s) ",
+      paste(utils::head(big, 5), collapse = ", "),
+      " have values above 100 in 1% of cells: is 'x' already transformed? bridgenorm does not transform it.",
+      call. = FALSE
+    )
+  }
 }
 
 # Stop unless target is "anchor" or "virtual".
@@ -105,6 +164,30 @@
   if (anyNA(samples$batch)) {
     stop("'samples' has a missing batch.", call. = FALSE)
   }
+  # An empty or blank id would silently turn its samples into one shared reference donor or aliquot.
+  for (col in intersect(
+    c("sample_id", "batch", "reference_id", "aliquot"),
+    names(samples)
+  )) {
+    v <- as.character(samples[[col]])
+    blank <- !is.na(v) & !nzchar(trimws(v))
+    if (any(blank)) {
+      stop(
+        sprintf(
+          "'samples$%s' is empty or blank for sample(s): %s. Use NA for samples that are not references.",
+          col,
+          paste(utils::head(ids[blank], 10), collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+    if (any(grepl("\r", v, fixed = TRUE))) {
+      stop(
+        sprintf("'samples$%s' contains a carriage return.", col),
+        call. = FALSE
+      )
+    }
+  }
   samples
 }
 
@@ -166,6 +249,9 @@
       "'population' must be one non-missing label per row of 'x'.",
       call. = FALSE
     )
+  }
+  if (any(grepl("\r", population, fixed = TRUE))) {
+    stop("'population' contains a carriage return.", call. = FALSE)
   }
 
   samples <- .bn_check_samples(samples)
@@ -252,9 +338,12 @@ bn_bridges <- function(samples, anchor) {
 # Bridge table from per-row batch and reference ids (NA = not a reference).
 .bn_bridge_table <- function(batch, ref, anchor) {
   anchor_ids <- unique(ref[batch == anchor & !is.na(ref)])
-  others <- sort(setdiff(unique(batch), anchor))
+  others <- sort(setdiff(unique(batch), anchor), method = "radix")
   shared <- lapply(others, function(b) {
-    sort(intersect(unique(ref[batch == b & !is.na(ref)]), anchor_ids))
+    sort(
+      intersect(unique(ref[batch == b & !is.na(ref)]), anchor_ids),
+      method = "radix"
+    )
   })
   tibble::tibble(
     batch = others,

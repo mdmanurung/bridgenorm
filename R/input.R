@@ -105,6 +105,30 @@
   if (anyNA(samples$batch)) {
     stop("'samples' has a missing batch.", call. = FALSE)
   }
+  # An empty or blank id would silently turn its samples into one shared reference donor or aliquot.
+  for (col in intersect(
+    c("sample_id", "batch", "reference_id", "aliquot"),
+    names(samples)
+  )) {
+    v <- as.character(samples[[col]])
+    blank <- !is.na(v) & !nzchar(trimws(v))
+    if (any(blank)) {
+      stop(
+        sprintf(
+          "'samples$%s' is empty or blank for sample(s): %s. Use NA for samples that are not references.",
+          col,
+          paste(utils::head(ids[blank], 10), collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+    if (any(grepl("\r", v, fixed = TRUE))) {
+      stop(
+        sprintf("'samples$%s' contains a carriage return.", col),
+        call. = FALSE
+      )
+    }
+  }
   samples
 }
 
@@ -166,6 +190,9 @@
       "'population' must be one non-missing label per row of 'x'.",
       call. = FALSE
     )
+  }
+  if (any(grepl("\r", population, fixed = TRUE))) {
+    stop("'population' contains a carriage return.", call. = FALSE)
   }
 
   samples <- .bn_check_samples(samples)

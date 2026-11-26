@@ -1,13 +1,13 @@
 # bn_fit(): two-pass node correction with per-node quantile maps.
 
 # Toy data: anchor b1 and batch b2, two reference donors per batch plus one study sample in b2.
-# Two clusters on the mapping marker CD3 (A near 1, B near 4). In b2, marker M is a known monotone
+# Two clusters on the mapping marker Lin (A near 1, B near 4). In b2, marker M is a known monotone
 # function of the anchor-scale value z: M = centre + 0.6 * (z - centre) + shift, a scale change the
 # node shift cannot remove. The anchor-scale value z of every cell is kept as the expected value.
 quantile_sim <- function(seed = 21, n = 400) {
   set.seed(seed)
   centre_m <- c(A = 2, B = 1)
-  centre_cd3 <- c(A = 1, B = 4)
+  centre_lin <- c(A = 1, B = 4)
   shift <- c(A = 0.4, B = -0.3)
   samples <- data.frame(
     sample_id = c("D1_b1", "D2_b1", "D1_b2", "D2_b2", "S_b2"),
@@ -28,7 +28,7 @@ quantile_sim <- function(seed = 21, n = 400) {
           }
           data.frame(
             sample_id = samples$sample_id[i],
-            CD3 = stats::rnorm(n, centre_cd3[[k]], 0.2),
+            Lin = stats::rnorm(n, centre_lin[[k]], 0.2),
             M = m,
             z = z
           )
@@ -42,10 +42,10 @@ quantile_sim <- function(seed = 21, n = 400) {
 fit_quantile_sim <- function(s, ...) {
   args <- utils::modifyList(
     list(
-      x = s$x[, c("sample_id", "CD3", "M")],
+      x = s$x[, c("sample_id", "Lin", "M")],
       samples = s$samples,
       population = rep("T", nrow(s$x)),
-      markers = c("CD3", "M"),
+      markers = c("Lin", "M"),
       transform = list(name = "asinh", cofactor = 5),
       anchor = "b1",
       min_cells = 20,
@@ -53,7 +53,7 @@ fit_quantile_sim <- function(s, ...) {
       method = "paired",
       eb_settings = NULL,
       grid = c(2, 1),
-      mapping_markers = "CD3",
+      mapping_markers = "Lin",
       train_cells = 200,
       rlen = 50,
       seed = 473,
@@ -71,7 +71,7 @@ fit_quantile_sim <- function(s, ...) {
 integrate_sim <- function(model, s) {
   bn_apply(
     model,
-    s$x[, c("sample_id", "CD3", "M")],
+    s$x[, c("sample_id", "Lin", "M")],
     s$samples,
     rep("T", nrow(s$x)),
     transform = list(name = "asinh", cofactor = 5),
@@ -117,10 +117,10 @@ test_that("a (batch, node) below min_cells pooled reference cells keeps the pass
   # b3 references: 2 wells x 30 cells per node = 60 pooled; b2: 2 x 150 = 300. min_cells 70 sits between.
   s <- nodes_sim(small_b3 = TRUE)
   args <- list(
-    x = s$x[, c("sample_id", "CD3", "M")],
+    x = s$x[, c("sample_id", "Lin", "M")],
     samples = s$samples,
     population = rep("T", nrow(s$x)),
-    markers = c("CD3", "M"),
+    markers = c("Lin", "M"),
     transform = list(name = "asinh", cofactor = 5),
     anchor = "b1",
     min_cells = 70,
@@ -128,7 +128,7 @@ test_that("a (batch, node) below min_cells pooled reference cells keeps the pass
     method = "paired",
     eb_settings = NULL,
     grid = c(2, 1),
-    mapping_markers = "CD3",
+    mapping_markers = "Lin",
     train_cells = 200,
     rlen = 50,
     seed = 473,
@@ -138,10 +138,13 @@ test_that("a (batch, node) below min_cells pooled reference cells keeps the pass
     tail = "shift",
     shrink_k = 0
   )
-  model <- do.call(bn_fit, args)
+  expect_warning(
+    model <- do.call(bn_fit, args),
+    "No quantile maps for batch\\(es\\) b3"
+  )
   res <- bn_apply(
     model,
-    s$x[, c("sample_id", "CD3", "M")],
+    s$x[, c("sample_id", "Lin", "M")],
     s$samples,
     rep("T", nrow(s$x)),
     transform = list(name = "asinh", cofactor = 5),
@@ -197,14 +200,14 @@ test_that("the defaults are the benchmarked settings", {
     shrink_k = 300
   )
   defaults <- bn_fit(
-    x = s$x[, c("sample_id", "CD3", "M")],
+    x = s$x[, c("sample_id", "Lin", "M")],
     samples = s$samples,
     population = rep("T", nrow(s$x)),
-    markers = c("CD3", "M"),
+    markers = c("Lin", "M"),
     transform = list(name = "asinh", cofactor = 5),
     anchor = "b1",
     grid = c(2, 1),
-    mapping_markers = "CD3",
+    mapping_markers = "Lin",
     seed = 473
   )
   expect_identical(defaults$quantiles, explicit$quantiles)
@@ -222,7 +225,7 @@ expect_shrunk_tables <- function(s, raw, shrunk, k) {
   probs <- seq(0.025, 0.975, length.out = 21)
   ref <- s$x[
     !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
-    c("sample_id", "CD3", "M")
+    c("sample_id", "Lin", "M")
   ]
   integ <- function(m, cells) {
     bn_apply(
@@ -238,7 +241,7 @@ expect_shrunk_tables <- function(s, raw, shrunk, k) {
   nodes <- integ(raw$pass2, x1)$nodes
   batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
   q_of <- function(i) {
-    sapply(c("CD3", "M"), function(m) {
+    sapply(c("Lin", "M"), function(m) {
       stats::quantile(x1[[m]][i], probs, names = FALSE, type = 7)
     })
   }
@@ -248,7 +251,7 @@ expect_shrunk_tables <- function(s, raw, shrunk, k) {
     ga <- paste("b1", node, sep = "\r")
     skip_if(is.null(raw$quantiles[[g]]) || is.null(raw$quantiles[[ga]]))
     n <- sum(batch == "b2" & nodes == node)
-    w <- n / (n + k) # k: one number, or one per marker (CD3, M)
+    w <- n / (n + k) # k: one number, or one per marker (Lin, M)
     qa <- q_of(batch == "b1" & nodes == node)
     expected <- qa +
       sweep(q_of(batch == "b2" & nodes == node) - qa, 2, w, "*") +
@@ -285,7 +288,7 @@ test_that("shrink_k = 0 leaves every quantile table as fitted", {
   probs <- seq(0.025, 0.975, length.out = 21)
   ref <- s$x[
     !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
-    c("sample_id", "CD3", "M")
+    c("sample_id", "Lin", "M")
   ]
   x1 <- bn_apply(
     model$pass1,
@@ -313,7 +316,7 @@ test_that("shrink_k = 0 leaves every quantile table as fitted", {
   )
 })
 
-test_that("only batches with exactly the anchor's reference donors get quantile maps (RV2)", {
+test_that("only batches with exactly the anchor's reference donors get quantile maps", {
   skip_if_not_installed("kohonen")
   s <- quantile_sim()
   # b3: unbridged (donor D3 only). b4: partly bridged (D1 shared, D3 not). Cells copied from b2.
@@ -332,7 +335,10 @@ test_that("only batches with exactly the anchor's reference donors get quantile 
   )
   s$x <- rbind(s$x, do.call(rbind, lapply(extra, `[[`, "x")))
   s$samples <- rbind(s$samples, do.call(rbind, lapply(extra, `[[`, "samples")))
-  model <- fit_quantile_sim(s, unbridged = "abstain", shrink_k = 300)
+  expect_warning(
+    model <- fit_quantile_sim(s, unbridged = "abstain", shrink_k = 300),
+    "No quantile maps for batch\\(es\\) b3, b4"
+  )
   expect_false(any(grepl("^b[34]\r", names(model$quantiles))))
   expect_true(any(grepl("^b2\r", names(model$quantiles))))
   res <- integrate_sim(model, s)
@@ -362,7 +368,7 @@ test_that("shrink_k = \"eb\" estimates one pseudo-count per marker, floored at 3
   probs <- seq(0.025, 0.975, length.out = 21)
   ref <- s$x[
     !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
-    c("sample_id", "CD3", "M")
+    c("sample_id", "Lin", "M")
   ]
   integ <- function(m, cells) {
     bn_apply(m, cells, s$samples, rep("T", nrow(cells)))
@@ -371,11 +377,11 @@ test_that("shrink_k = \"eb\" estimates one pseudo-count per marker, floored at 3
   nodes <- integ(raw$pass2, x1)$nodes
   batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
   med <- function(i) {
-    sapply(c("CD3", "M"), function(m) {
+    sapply(c("Lin", "M"), function(m) {
       stats::quantile(x1[[m]][i], 0.5, names = FALSE, type = 7)
     })
   }
-  vr <- function(i) sapply(c("CD3", "M"), function(m) stats::var(x1[[m]][i]))
+  vr <- function(i) sapply(c("Lin", "M"), function(m) stats::var(x1[[m]][i]))
   glob <- med(batch == "b2") - med(batch == "b1")
   parts <- lapply(sort(unique(nodes)), function(node) {
     ib <- batch == "b2" & nodes == node
@@ -413,7 +419,7 @@ test_that("target = \"virtual\" maps every batch, the anchor too, to the per-nod
   probs <- seq(0.025, 0.975, length.out = 21)
   ref <- s$x[
     !is.na(s$samples$reference_id[match(s$x$sample_id, s$samples$sample_id)]),
-    c("sample_id", "CD3", "M")
+    c("sample_id", "Lin", "M")
   ]
   integ <- function(m, cells) {
     bn_apply(m, cells, s$samples, rep("T", nrow(cells)))
@@ -422,7 +428,7 @@ test_that("target = \"virtual\" maps every batch, the anchor too, to the per-nod
   nodes <- integ(raw$pass2, x1)$nodes
   batch <- s$samples$batch[match(x1$sample_id, s$samples$sample_id)]
   q_of <- function(i) {
-    sapply(c("CD3", "M"), function(m) {
+    sapply(c("Lin", "M"), function(m) {
       stats::quantile(x1[[m]][i], probs, names = FALSE, type = 7)
     })
   }

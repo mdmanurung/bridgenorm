@@ -52,6 +52,38 @@ bn_apply <- function(
   unsupported = "abstain",
   sample_ids = NULL
 ) {
+  res <- .bn_apply(
+    model,
+    x,
+    samples,
+    population,
+    transform,
+    unsupported,
+    sample_ids
+  )
+  # Say once which batches were left entirely raw: actions and print() alone are easy to miss.
+  raw <- tapply(res$actions$action == "abstain", res$actions$batch, all)
+  raw <- names(raw)[raw]
+  if (length(raw) > 0) {
+    message(
+      "bn_apply(): no correction applied to batch(es) ",
+      paste(raw, collapse = ", "),
+      "; their values are unchanged. See result$actions$reason."
+    )
+  }
+  res
+}
+
+# bn_apply() without the user-facing message; the fit passes and component models call this.
+.bn_apply <- function(
+  model,
+  x,
+  samples,
+  population,
+  transform = model$transform,
+  unsupported = "abstain",
+  sample_ids = NULL
+) {
   .bn_stop_missing(c(
     model = missing(model),
     x = missing(x),

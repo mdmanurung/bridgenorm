@@ -214,7 +214,7 @@ bn_fit <- function(
     )
   }
   integrate_pass <- function(m, xp) {
-    bn_apply(
+    .bn_apply(
       m,
       xp,
       samples,
@@ -240,10 +240,19 @@ bn_fit <- function(
   n_cells <- lengths(groups)
   # A quantile map matches pooled reference distributions, so only batches whose reference donors are exactly
   # the anchor's get tables; an unbridged or partly bridged batch keeps the pass-2 shift (heb 0.7.2).
+  # Donors count only through aliquots with at least min_cells cells, the gate the shift passes use.
   ref_cells <- d$cells[ref_rows, ]
-  donors <- lapply(split(ref_cells$reference_id, ref_cells$batch), \(r) {
-    sort(unique(r))
-  })
+  aliquot_key <- paste(ref_cells$batch, ref_cells$aliquot, sep = "\r")
+  big <- aliquot_key %in% names(which(table(aliquot_key) >= min_cells))
+  donors <- lapply(
+    split(
+      ref_cells$reference_id[big],
+      factor(ref_cells$batch[big], levels = unique(ref_cells$batch))
+    ),
+    \(r) {
+      sort(unique(r), method = "radix")
+    }
+  )
   same_donors <- names(donors)[vapply(
     donors,
     identical,
@@ -253,6 +262,39 @@ bn_fit <- function(
   groups <- groups[
     n_cells >= min_cells & sub("\r.*", "", names(groups)) %in% same_donors
   ]
+  no_tables <- setdiff(unique(d$cells$batch), c(same_donors, anchor))
+  if (length(no_tables) > 0) {
+    warning(
+      sprintf(
+        "No quantile maps for batch(es) %s: their reference donors passing min_cells differ from the anchor's (%s). They get node shifts only, or stay raw if unbridged; see the fit's actions.",
+        paste(no_tables, collapse = ", "),
+        paste(donors[[anchor]], collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  # Pooled tables weight donors by their cell counts; unequal shares between a batch and the anchor bias the
+  # map (documented limit).
+  if (length(donors[[anchor]]) > 1) {
+    share <- prop.table(
+      table(ref_cells$batch[big], ref_cells$reference_id[big]),
+      1
+    )
+    off <- same_donors[vapply(
+      same_donors,
+      \(b) max(abs(share[b, ] - share[anchor, ])) > 0.1,
+      logical(1)
+    )]
+    if (length(off) > 0) {
+      warning(
+        sprintf(
+          "Bridge donors' cell shares differ from the anchor's by more than 10 percentage points in batch(es) %s. Quantile maps pool donors, so unequal shares bias the correction.",
+          paste(off, collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+  }
   q_table <- function(i) {
     q <- apply(
       x1m[i, , drop = FALSE],
@@ -405,7 +447,7 @@ bn_fit <- function(
   .bn_validate_node_quantile(model)
   d <- .bn_cells(x, samples, population, model$markers, sample_ids)
   ids <- d$cells$sample_id
-  r1 <- bn_apply(
+  r1 <- .bn_apply(
     model$pass1,
     x,
     samples,
@@ -414,7 +456,7 @@ bn_fit <- function(
     "abstain",
     sample_ids = ids
   )
-  r2 <- bn_apply(
+  r2 <- .bn_apply(
     model$pass2,
     r1$x,
     samples,
@@ -435,6 +477,7 @@ bn_fit <- function(
   }
   key <- paste(d$cells$batch, r2$nodes, sep = "\r")
   mapped_keys <- character(0)
+  tied <- list()
   for (g in intersect(unique(key), names(model$quantiles))) {
     qa <- model$quantiles[[paste(target, sub(".*\r", "", g), sep = "\r")]]
     if (is.null(qa)) {
@@ -443,6 +486,11 @@ bn_fit <- function(
     qb <- model$quantiles[[g]]
     i <- which(key == g)
     for (m in model$markers) {
+      # A marker with one value in the batch's quantile table has no map; it keeps the pass-2 node shift.
+      if (length(unique(qb[, m])) < 2) {
+        tied[[g]] <- c(tied[[g]], m)
+        next
+      }
       vi <- v[i, m]
       res <- stats::approx(qb[, m], qa[, m], xout = vi, ties = mean, rule = 2)$y
       low <- vi < qb[1, m]
@@ -459,12 +507,23 @@ bn_fit <- function(
   a1$pass <- 1L
   a2 <- r2$actions
   a2$pass <- 2L
-  q_row <- paste(a2$batch, a2$population, sep = "\r") %in% mapped_keys
+  a2_key <- paste(a2$batch, a2$population, sep = "\r")
+  # Tied rows (one quantile value) keep the pass-2 node shift and its action.
+  t_row <- vapply(
+    seq_along(a2_key),
+    function(r) a2$marker[[r]] %in% tied[[a2_key[[r]]]],
+    logical(1)
+  )
+  q_row <- a2_key %in% mapped_keys & !t_row
   a2$action[q_row] <- "apply"
   a2$reason_code[q_row] <- "node_quantile"
   a2$reason[
     q_row
   ] <- "Batch and anchor quantiles in this node; the quantile map was applied."
+  a2$reason_code[t_row] <- "node_quantile_tied"
+  a2$reason[
+    t_row
+  ] <- "One value in this batch's quantiles for this node and marker; the node shift was kept."
   actions <- rbind(a1, a2)
 
   # Keep the pass models as bn_apply() returned them: they carry effects of new batches.

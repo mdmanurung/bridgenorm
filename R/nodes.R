@@ -302,7 +302,7 @@
   transform,
   sample_ids
 ) {
-  res <- bn_apply(
+  res <- .bn_apply(
     global_paired,
     x,
     samples,
@@ -378,7 +378,7 @@
   )
   nodes <- model$map$labels[.bn_node_nearest(mapping$x, model$map)]
 
-  local <- bn_apply(
+  local <- .bn_apply(
     model$local,
     x,
     samples,
@@ -387,7 +387,7 @@
     "abstain",
     sample_ids = ids
   )
-  global <- bn_apply(
+  global <- .bn_apply(
     model$global,
     x,
     samples,

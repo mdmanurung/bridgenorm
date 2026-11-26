@@ -13,6 +13,6 @@
 "state-specific shift SD per marker (median)","0.1"
 "log scale SD per marker (median)","0.236"
 "SOM grid (all methods)","8x8"
-"bridgenorm","bridgenorm 0.10.0, defaults, all markers mapped"
+"bridgenorm","bridgenorm 1.0.0, defaults, all markers mapped"
 "CytoNorm","CytoNorm 2.0.10, FlowSOM nCells = 1e+06, xdim = 8, ydim = 8, nClus = 10, scale = FALSE; defaults except the grid"
 "cyCombine","cyCombine 0.3.0, defaults (8x8); run twice: no covariate, and the true condition as covariate"

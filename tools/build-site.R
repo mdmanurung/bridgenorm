@@ -43,7 +43,7 @@ patterns <- patterns[nzchar(patterns)]
 leaks <- unlist(lapply(patterns, function(p) {
   hits <- suppressWarnings(system2(
     "grep",
-    c("-rliE", shQuote(p), PUBLIC),
+    c("-rliEI", shQuote(p), PUBLIC),
     stdout = TRUE
   )) # exit 1 = no match
   if (length(hits) > 0) paste0(p, ": ", paste(hits, collapse = ", "))

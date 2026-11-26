@@ -99,6 +99,21 @@
 #'   dropped. The anchor still sets the bridges and the map and may lie outside
 #'   the goal; the fit stops when the goal lacks a reference summary the anchor
 #'   has. Nodes without a goal quantile table take the pass-2 node shift.
+#' @param shrink_target What each node's offset curve is shrunk toward.
+#'   \code{"quantile"} (default) adds the batch-wide offset at the same
+#'   probability, which equals the node's offset only under a pure location
+#'   shift. \code{"value"} evaluates the batch-wide map (the batch's
+#'   quantile function composed with the target's distribution function) at
+#'   the node's own target quantiles, so an intensity-dependent effect that is
+#'   the same in every node is not shrunk toward a wrong curve. Beyond the
+#'   outer batch-wide quantiles the map moves by their difference.
+#' @param shrink_reweight \code{FALSE} (default), or \code{TRUE} to compute the
+#'   batch-wide curve with cell weights that give the batch the target's
+#'   share of reference cells in every second-pass node (the anchor's, or with
+#'   \code{target = "virtual"} the mean over the goal batches). It matters when
+#'   a batch's bridge samples have a different cell-state mix than the target's.
+#' @param quantile_maps \code{TRUE} (default), or \code{FALSE} to keep no
+#'   quantile tables, so every cell takes the pass-2 node shift (an ablation).
 #' @param sample_ids Optional sample id per row; required for a matrix
 #'   \code{x}.
 #'
@@ -144,7 +159,10 @@ bn_fit <- function(
   shrink_k = 300,
   target = "anchor",
   goal_batches = NULL,
-  sample_ids = NULL
+  sample_ids = NULL,
+  shrink_target = "quantile",
+  shrink_reweight = FALSE,
+  quantile_maps = TRUE
 ) {
   .bn_stop_missing(c(
     x = missing(x),
@@ -191,6 +209,18 @@ bn_fit <- function(
     what = "bn_fit"
   )
   .bn_check_target(target)
+  .bn_check_choice(
+    shrink_target,
+    "shrink_target",
+    c("quantile", "value"),
+    what = "bn_fit"
+  )
+  if (!isTRUE(shrink_reweight) && !isFALSE(shrink_reweight)) {
+    stop("'shrink_reweight' must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (!isTRUE(quantile_maps) && !isFALSE(quantile_maps)) {
+    stop("'quantile_maps' must be TRUE or FALSE.", call. = FALSE)
+  }
   samples <- .bn_check_samples(samples)
   goal_batches <- .bn_check_goal_batches(goal_batches, target, samples)
   if (target == "virtual" && identical(shrink_k, "eb")) {
@@ -284,7 +314,9 @@ bn_fit <- function(
     donors[[anchor]]
   )]
   groups <- groups[
-    n_cells >= min_cells & sub("\r.*", "", names(groups)) %in% same_donors
+    n_cells >= min_cells &
+      quantile_maps &
+      sub("\r.*", "", names(groups)) %in% same_donors
   ]
   no_tables <- setdiff(unique(d$cells$batch), c(same_donors, anchor))
   if (length(no_tables) > 0) {
@@ -357,14 +389,18 @@ bn_fit <- function(
     goal_tables <- covered[sub("\r.*", "", covered) %in% goal_used]
     by_node <- split(goal_tables, node_of(goal_tables))
     target_q <- lapply(by_node, \(gs) Reduce(`+`, quantiles[gs]) / length(gs))
-    names(target_q) <- paste(.bn_virtual, names(by_node), sep = "\r")
+    if (length(by_node) > 0) {
+      names(target_q) <- paste(.bn_virtual, names(by_node), sep = "\r")
+    }
     target_batch_q <- Reduce(`+`, batch_q[goal_used]) / length(goal_used)
+    target_share_of <- goal_used
     target_key <- \(g) paste(.bn_virtual, node_of(g), sep = "\r")
     # Nodes without a goal table take the pass-2 node shift.
     todo <- covered[node_of(covered) %in% names(by_node)]
   } else {
     target_q <- quantiles
     target_batch_q <- batch_q[[anchor]]
+    target_share_of <- anchor
     target_key <- \(g) paste(anchor, node_of(g), sep = "\r")
     todo <- covered[sub("\r.*", "", covered) != anchor]
   }
@@ -385,6 +421,21 @@ bn_fit <- function(
     stats::setNames(rep(shrink_k, length(markers)), markers)
   }
   if (any(k_marker > 0)) {
+    # Batch-wide curve per batch, optionally reweighted to the target's node shares (shrink_reweight).
+    batch_curve <- batch_q
+    if (shrink_reweight) {
+      share <- prop.table(table(ref_batch, nodes), 1)
+      share_target <- colMeans(share[target_share_of, , drop = FALSE])
+      batch_curve <- lapply(
+        stats::setNames(nm = names(batch_q)),
+        \(b) {
+          i <- which(ref_batch == b)
+          w <- share_target[as.character(nodes[i])] /
+            share[b, as.character(nodes[i])]
+          .bn_weighted_table(x1m[i, , drop = FALSE], w, quantile_probs)
+        }
+      )
+    }
     shrunk <- quantiles
     for (g in todo) {
       b <- sub("\r.*", "", g)
@@ -396,9 +447,15 @@ bn_fit <- function(
         length(markers),
         byrow = TRUE
       )
-      q <- qa +
-        w * (quantiles[[g]] - qa) +
-        (1 - w) * (batch_q[[b]] - target_batch_q)
+      q <- if (shrink_target == "value") {
+        w *
+          quantiles[[g]] +
+          (1 - w) * .bn_value_target(qa, target_batch_q, batch_curve[[b]])
+      } else {
+        qa +
+          w * (quantiles[[g]] - qa) +
+          (1 - w) * (batch_curve[[b]] - target_batch_q)
+      }
       # Sort each column (rearrangement): the mix of three monotone curves can cross itself, and a
       # non-monotone table would swap the order of cells (heb 0.7.1).
       shrunk[[g]] <- apply(q, 2, sort)
@@ -436,8 +493,58 @@ bn_fit <- function(
   )
   # Stored only when given, so fits without a goal keep their 1.0.0 layout and digest.
   model$settings$goal_batches <- goal_batches
+  # Likewise the shrinkage options, only when they differ from the 1.0.0 behaviour.
+  if (shrink_target != "quantile") {
+    model$settings$shrink_target <- shrink_target
+  }
+  if (shrink_reweight) {
+    model$settings$shrink_reweight <- TRUE
+  }
+  if (!quantile_maps) {
+    model$settings$quantile_maps <- FALSE
+  }
   model$digest <- .bn_digest(model)
   model
+}
+
+# Quantile table of the rows of xm with cell weights w (weighted empirical quantile function, linear between the
+# midpoints of the cumulative weight); same shape as q_table() in bn_fit().
+.bn_weighted_table <- function(xm, w, probs) {
+  w <- as.numeric(w)
+  keep <- is.finite(w) & w > 0
+  xm <- xm[keep, , drop = FALSE]
+  w <- w[keep]
+  q <- apply(xm, 2, \(v) {
+    o <- order(v)
+    cw <- cumsum(w[o])
+    pos <- (cw - w[o] / 2) / cw[[length(cw)]]
+    stats::approx(pos, v[o], xout = probs, ties = mean, rule = 2)$y
+  })
+  matrix(q, nrow = length(probs), dimnames = list(NULL, colnames(xm)))
+}
+
+# Value-matched shrinkage target: the batch-wide map from the target's scale to the batch's scale (knots: the
+# target's batch-wide quantiles and the batch's), evaluated at the node's target quantiles qa. Beyond the outer
+# knots it moves by the outer difference; a marker with one distinct target knot falls back to the median offset.
+.bn_value_target <- function(qa, curve_target, curve_batch) {
+  out <- qa
+  mid <- ceiling(nrow(qa) / 2)
+  for (m in seq_len(ncol(qa))) {
+    x <- curve_target[, m]
+    y <- curve_batch[, m]
+    if (length(unique(x)) < 2) {
+      out[, m] <- qa[, m] + y[[mid]] - x[[mid]]
+      next
+    }
+    n <- length(x)
+    v <- stats::approx(x, y, xout = qa[, m], ties = mean, rule = 2)$y
+    low <- qa[, m] < min(x)
+    high <- qa[, m] > max(x)
+    v[low] <- qa[low, m] + y[[1]] - x[[1]]
+    v[high] <- qa[high, m] + y[[n]] - x[[n]]
+    out[, m] <- v
+  }
+  out
 }
 
 # Marker columns of x as a double matrix.

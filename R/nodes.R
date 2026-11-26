@@ -129,6 +129,7 @@
   if (
     !is.numeric(grid) ||
       length(grid) != 2 ||
+      anyNA(grid) ||
       any(grid < 1) ||
       any(grid != round(grid))
   ) {
@@ -142,7 +143,9 @@
   }
   for (arg in c("train_cells", "rlen")) {
     v <- get(arg)
-    if (!is.numeric(v) || length(v) != 1 || v < 1 || v != round(v)) {
+    if (
+      !is.numeric(v) || length(v) != 1 || is.na(v) || v < 1 || v != round(v)
+    ) {
       stop(
         sprintf("'%s' must be one positive whole number.", arg),
         call. = FALSE

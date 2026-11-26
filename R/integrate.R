@@ -41,6 +41,18 @@
 #'   \code{model} (the input model, or a copy extended with new-batch
 #'   effects, with a new digest and \code{parent_digest}), \code{excluded}
 #'   and \code{aliquot_source}.
+#' @example inst/examples/bn-toy.R
+#' @examples
+#' model <- bn_fit(
+#'   x, samples, population = rep("T", nrow(x)), markers = c("Lin", "M"),
+#'   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
+#'   grid = c(2, 1), mapping_markers = "Lin", seed = 1, rlen = 20
+#' )
+#' res <- bn_apply(model, x, samples, rep("T", nrow(x)))
+#' res
+#' # Mean of M in the study samples per batch, before and after.
+#' tapply(x$M[startsWith(x$sample_id, "s")], x$sample_id[startsWith(x$sample_id, "s")], mean)
+#' tapply(res$x$M[startsWith(x$sample_id, "s")], x$sample_id[startsWith(x$sample_id, "s")], mean)
 #' @seealso \code{\link{bn_fit}}
 #' @export
 bn_apply <- function(

@@ -28,6 +28,9 @@
 #'   the scale \code{x} is on. It does not change the report; when given, it
 #'   is checked and stored as the \code{transform} attribute of the result.
 #' @return A tibble with one row per batch, population and marker.
+#' @example inst/examples/bn-toy.R
+#' @examples
+#' bn_reference_noise(x, samples, rep("T", nrow(x)), markers = "M")
 #' @seealso \code{\link{bn_fit}}, \code{\link{bn_bridges}}
 #' @export
 bn_reference_noise <- function(

@@ -208,6 +208,16 @@ print.bn_paired_model <- function(x, ...) {
 #' @param path File path.
 #' @return \code{bn_save()} returns \code{path} invisibly; \code{bn_load()}
 #'   returns the model.
+#' @example inst/examples/bn-toy.R
+#' @examples
+#' model <- bn_fit(
+#'   x, samples, population = rep("T", nrow(x)), markers = c("Lin", "M"),
+#'   transform = list(name = "asinh", cofactor = 5), anchor = "b1",
+#'   grid = c(2, 1), mapping_markers = "Lin", seed = 1, rlen = 20
+#' )
+#' path <- tempfile(fileext = ".rds")
+#' bn_save(model, path)
+#' identical(bn_load(path)$digest, model$digest)
 #' @export
 bn_save <- function(model, path) {
   .bn_stop_missing(c(model = missing(model), path = missing(path)))
@@ -220,6 +230,9 @@ bn_save <- function(model, path) {
 #' @export
 bn_load <- function(path) {
   .bn_stop_missing(c(path = missing(path)))
+  if (!is.character(path) || length(path) != 1 || !file.exists(path)) {
+    stop("'path' must be one existing file.", call. = FALSE)
+  }
   model <- readRDS(path)
   .bn_validate_any(model)
   model

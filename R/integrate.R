@@ -144,7 +144,10 @@ bn_apply <- function(
   d <- .bn_cells(x, samples, population, model$markers, sample_ids)
 
   # Only batches the model has never seen may get new effects.
-  new_batches <- setdiff(sort(unique(d$cells$batch)), model$known_batches)
+  new_batches <- setdiff(
+    sort(unique(d$cells$batch), method = "radix"),
+    model$known_batches
+  )
   new_eff <- .bn_empty_effects()
   new_exc <- .bn_empty_excluded()
   if (length(new_batches) > 0) {
@@ -170,9 +173,12 @@ bn_apply <- function(
   # Extend a copy; the input model and its effects stay as they were.
   updated <- model
   if (nrow(new_eff) > 0) {
-    added <- sort(unique(new_eff$batch))
+    added <- sort(unique(new_eff$batch), method = "radix")
     updated$effects <- dplyr::bind_rows(model$effects, new_eff)
-    updated$known_batches <- sort(c(model$known_batches, added))
+    updated$known_batches <- sort(
+      c(model$known_batches, added),
+      method = "radix"
+    )
     updated$excluded <- dplyr::bind_rows(
       model$excluded,
       new_exc[new_exc$batch %in% added, , drop = FALSE]

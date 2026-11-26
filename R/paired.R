@@ -74,7 +74,12 @@ bn_fit_paired <- function(
     transform = missing(transform),
     anchor = missing(anchor)
   ))
-  .bn_check_choice(unbridged, "unbridged", c("stop", "abstain"))
+  .bn_check_choice(
+    unbridged,
+    "unbridged",
+    c("stop", "abstain"),
+    what = "bn_fit_paired"
+  )
   .bn_check_target(target)
   samples <- .bn_check_samples(samples)
   # Paired shift has no hierarchy; every batch sits in one study.
@@ -118,7 +123,6 @@ bn_fit_paired <- function(
     com,
     anchor,
     min_cells,
-    hierarchy[hierarchy$batch %in% com$batches, , drop = FALSE],
     effects,
     targets,
     s$excluded

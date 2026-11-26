@@ -1,7 +1,7 @@
 # Two-pass node correction with per-node quantile maps: bn_fit() and its apply path.
 #
 
-.bn_node_quantile_schema_version <- "bn_node_quantile_model/1"
+.bn_node_quantile_schema_version <- "bn_node_quantile_model/2"
 
 #' Fit a two-pass node model with per-node quantile maps
 #'
@@ -72,17 +72,13 @@
 #'   (batch, node) quantile table.
 #' @param unbridged \code{"abstain"} leaves a batch that shares no bridge
 #'   donor with the anchor raw and flags it; \code{"stop"} refuses the fit.
-#' @param method Node estimator; only \code{"paired"}.
-#' @param eb_settings Only \code{NULL}; kept for future estimators.
 #' @param train_cells Maximum training cells per reference sample for the SOM.
 #' @param rlen Number of SOM training passes (\code{kohonen::som}).
-#' @param assignment How cells are assigned to nodes; only \code{"nearest"}.
 #' @param fallback For a (batch, node, marker) without a node effect:
 #'   \code{"global"} takes the batch's global shift, \code{"abstain"} keeps
 #'   the raw value.
 #' @param quantile_probs Increasing probabilities in (0, 1), at least two,
 #'   at which batch and anchor quantiles are matched.
-#' @param tail Rule beyond the outer quantiles; only \code{"shift"}.
 #' @param shrink_k Non-negative pseudo-count of cells for the shrinkage toward
 #'   the batch-wide offset curve. Larger values borrow more; \code{0} turns
 #'   shrinkage off. \code{"eb"} estimates one pseudo-count per marker by
@@ -109,7 +105,8 @@
 #'   \code{schema_version}, \code{settings}, \code{markers},
 #'   \code{transform}, \code{anchor}, \code{pass1} and \code{pass2} (frozen
 #'   node models), \code{quantiles} (one probabilities-by-markers matrix per
-#'   "batch\\rnode"), \code{software}, \code{created},
+#'   batch and node; the list names are internal keys), \code{software},
+#'   \code{created},
 #'   \code{parent_digest} and \code{digest}.
 #' @seealso \code{\link{bn_apply}}, \code{\link{bn_fit_paired}}
 #' @export
@@ -125,14 +122,10 @@ bn_fit <- function(
   seed,
   min_cells = 50,
   unbridged = "abstain",
-  method = "paired",
-  eb_settings = NULL,
   train_cells = 500,
   rlen = 100,
-  assignment = "nearest",
   fallback = "global",
   quantile_probs = seq(0.025, 0.975, length.out = 21),
-  tail = "shift",
   shrink_k = 300,
   target = "anchor",
   sample_ids = NULL
@@ -148,7 +141,6 @@ bn_fit <- function(
     mapping_markers = missing(mapping_markers),
     seed = missing(seed)
   ))
-  .bn_check_choice(tail, "tail", "shift", what = "bn_fit")
   if (
     !is.numeric(quantile_probs) ||
       length(quantile_probs) < 2 ||
@@ -170,6 +162,18 @@ bn_fit <- function(
   ) {
     stop("'shrink_k' must be one finite number >= 0, or \"eb\".", call. = FALSE)
   }
+  .bn_check_choice(
+    unbridged,
+    "unbridged",
+    c("stop", "abstain"),
+    what = "bn_fit"
+  )
+  .bn_check_choice(
+    fallback,
+    "fallback",
+    c("global", "abstain"),
+    what = "bn_fit"
+  )
   .bn_check_target(target)
   if (target == "virtual" && identical(shrink_k, "eb")) {
     stop("target = \"virtual\" does not take shrink_k = \"eb\".", call. = FALSE)
@@ -200,14 +204,14 @@ bn_fit <- function(
       anchor = anchor,
       min_cells = min_cells,
       unbridged = unbridged,
-      method = method,
-      eb_settings = eb_settings,
+      method = "paired",
+      eb_settings = NULL,
       grid = grid,
       mapping_markers = mapping_markers,
       train_cells = train_cells,
       rlen = rlen,
       seed = seed,
-      assignment = assignment,
+      assignment = "nearest",
       fallback = fallback,
       sample_ids = ids_ref,
       target = target
@@ -376,7 +380,7 @@ bn_fit <- function(
       schema_version = .bn_node_quantile_schema_version,
       settings = list(
         quantile_probs = quantile_probs,
-        tail = tail,
+        tail = "shift",
         min_cells = min_cells,
         quantile_type = 7L,
         shrink_k = shrink_k,
@@ -394,7 +398,7 @@ bn_fit <- function(
       parent_digest = NA_character_,
       digest = NA_character_
     ),
-    class = "bn_node_quantile_model"
+    class = c("bn_node_quantile_model", "bn_model")
   )
   model$digest <- .bn_digest(model)
   model
@@ -507,7 +511,7 @@ bn_fit <- function(
   a1$pass <- 1L
   a2 <- r2$actions
   a2$pass <- 2L
-  a2_key <- paste(a2$batch, a2$population, sep = "\r")
+  a2_key <- paste(a2$batch, a2$node, sep = "\r")
   # Tied rows (one quantile value) keep the pass-2 node shift and its action.
   t_row <- vapply(
     seq_along(a2_key),
@@ -543,7 +547,7 @@ bn_fit <- function(
         nrow(ab),
         ab$pass[1],
         ab$batch[1],
-        ab$population[1],
+        ab$node[1],
         ab$marker[1],
         ab$reason[1]
       ),

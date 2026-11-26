@@ -23,7 +23,7 @@
   if (!is.character(value) || length(value) != 1 || !value %in% choices) {
     stop(
       sprintf(
-        "%s needs %s = %s (no default).",
+        "%s needs %s = %s.",
         what,
         name,
         paste0("'", choices, "'", collapse = " or ")
@@ -279,9 +279,12 @@ bn_bridges <- function(samples, anchor) {
 # Bridge table from per-row batch and reference ids (NA = not a reference).
 .bn_bridge_table <- function(batch, ref, anchor) {
   anchor_ids <- unique(ref[batch == anchor & !is.na(ref)])
-  others <- sort(setdiff(unique(batch), anchor))
+  others <- sort(setdiff(unique(batch), anchor), method = "radix")
   shared <- lapply(others, function(b) {
-    sort(intersect(unique(ref[batch == b & !is.na(ref)]), anchor_ids))
+    sort(
+      intersect(unique(ref[batch == b & !is.na(ref)]), anchor_ids),
+      method = "radix"
+    )
   })
   tibble::tibble(
     batch = others,

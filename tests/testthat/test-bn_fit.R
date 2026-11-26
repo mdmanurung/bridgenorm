@@ -50,17 +50,13 @@ fit_quantile_sim <- function(s, ...) {
       anchor = "b1",
       min_cells = 20,
       unbridged = "stop",
-      method = "paired",
-      eb_settings = NULL,
       grid = c(2, 1),
       mapping_markers = "Lin",
       train_cells = 200,
       rlen = 50,
       seed = 473,
-      assignment = "nearest",
       fallback = "global",
       quantile_probs = seq(0.025, 0.975, length.out = 21),
-      tail = "shift",
       shrink_k = 0
     ),
     list(...)
@@ -125,17 +121,13 @@ test_that("a (batch, node) below min_cells pooled reference cells keeps the pass
     anchor = "b1",
     min_cells = 70,
     unbridged = "abstain",
-    method = "paired",
-    eb_settings = NULL,
     grid = c(2, 1),
     mapping_markers = "Lin",
     train_cells = 200,
     rlen = 50,
     seed = 473,
-    assignment = "nearest",
     fallback = "global",
     quantile_probs = seq(0.025, 0.975, length.out = 21),
-    tail = "shift",
     shrink_k = 0
   )
   expect_warning(
@@ -179,13 +171,13 @@ test_that("data-specific settings are required and invalid settings are refused"
       arg
     )
   }
-  expect_error(fit_quantile_sim(s, tail = "linear"), "tail")
+  expect_error(fit_quantile_sim(s, tail = "linear"), "unused argument")
   expect_error(fit_quantile_sim(s, shrink_k = -1), "shrink_k")
   expect_error(
     fit_quantile_sim(s, quantile_probs = c(0.5, 0.2)),
     "quantile_probs"
   )
-  expect_error(fit_quantile_sim(s, eb_settings = list()), "eb_settings")
+  expect_error(fit_quantile_sim(s, eb_settings = list()), "unused argument")
 })
 
 test_that("the defaults are the benchmarked settings", {

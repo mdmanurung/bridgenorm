@@ -1,85 +1,5 @@
-# Guards added for 1.0.0: tied quantile tables, blank ids, multi-donor shares, min_cells gate, raw batches.
-
-# Two cell states (A, B) on a state marker S and a corrected marker M, three batches, two bridge wells per batch.
-guard_sim <- function(
-  ref_ids = c("donor", "donor"),
-  n_ref = c(300, 300),
-  donor_off = c(0, 0),
-  study_ref = NA,
-  zero_b = FALSE,
-  n_b3 = 300
-) {
-  set.seed(1)
-  centre <- c(A = 2, B = 1)
-  s_pos <- c(A = 1, B = 4)
-  shift <- list(
-    b1 = c(A = 0, B = 0),
-    b2 = c(A = 0.4, B = -0.3),
-    b3 = c(A = -0.2, B = 0.3)
-  )
-  scale <- c(b1 = 1, b2 = 0.6, b3 = 1.4)
-  samples <- data.frame(
-    sample_id = c(outer(
-      c("ref1", "ref2", "s1", "s2"),
-      c("b1", "b2", "b3"),
-      paste,
-      sep = "_"
-    )),
-    batch = rep(c("b1", "b2", "b3"), each = 4),
-    reference_id = rep(c(ref_ids, study_ref, study_ref), 3),
-    aliquot = rep(c("ref1", "ref2", NA, NA), 3)
-  )
-  cells <- do.call(
-    rbind,
-    lapply(seq_len(nrow(samples)), function(i) {
-      b <- samples$batch[i]
-      j <- (i - 1) %% 4 + 1
-      n <- if (j <= 2 && b == "b2") {
-        n_ref[j]
-      } else if (j <= 2 && b == "b3") {
-        n_b3
-      } else {
-        300
-      }
-      off <- if (j <= 2) donor_off[j] else mean(donor_off)
-      do.call(
-        rbind,
-        lapply(c("A", "B"), function(k) {
-          truth <- stats::rnorm(n, centre[[k]] + off, 0.3)
-          m <- centre[[k]] +
-            scale[[b]] * (truth - centre[[k]]) +
-            shift[[b]][[k]]
-          if (zero_b && k == "B") {
-            m <- rep(0, n)
-          }
-          data.frame(
-            sample_id = samples$sample_id[i],
-            S = stats::rnorm(n, s_pos[[k]], 0.2),
-            M = m
-          )
-        })
-      )
-    })
-  )
-  list(x = cells, samples = samples)
-}
-
-guard_fit <- function(d, min_cells = 50) {
-  bn_fit(
-    d$x,
-    d$samples,
-    rep("T", nrow(d$x)),
-    markers = c("S", "M"),
-    transform = list(name = "asinh", cofactor = 5),
-    anchor = "b1",
-    grid = c(2, 1),
-    mapping_markers = "S",
-    seed = 1,
-    train_cells = 300,
-    rlen = 50,
-    min_cells = min_cells
-  )
-}
+# Guards added for 1.0.0: tied quantile tables, blank ids, multi-donor shares, min_cells gate, raw batches;
+# the model contract. guard_sim() and guard_fit() are in helper-guards.R.
 
 test_that("a marker with one value in a node keeps the node shift instead of stopping", {
   d <- guard_sim(zero_b = TRUE)
@@ -147,4 +67,135 @@ test_that("bn_apply() names batches it left raw", {
     "no correction applied to batch\\(es\\) b4"
   )
   expect_no_message(bn_apply(model, d$x, d$samples, rep("T", nrow(d$x))))
+})
+
+# 1.0.0 model contract ------------------------------------------------------------
+
+test_that("every model shares the bn_model parent class and a fixed field list", {
+  d <- guard_sim()
+  q <- guard_fit(d)
+  p <- bn_fit_paired(
+    d$x,
+    d$samples,
+    rep("T", nrow(d$x)),
+    markers = c("S", "M"),
+    transform = list(name = "asinh", cofactor = 5),
+    anchor = "b1"
+  )
+  expect_s3_class(q, c("bn_node_quantile_model", "bn_model"), exact = TRUE)
+  expect_s3_class(p, c("bn_paired_model", "bn_model"), exact = TRUE)
+  expect_s3_class(q$pass1, c("bn_node_model", "bn_model"), exact = TRUE)
+  expect_identical(
+    names(q),
+    c(
+      "schema_version",
+      "settings",
+      "markers",
+      "transform",
+      "anchor",
+      "pass1",
+      "pass2",
+      "quantiles",
+      "software",
+      "created",
+      "parent_digest",
+      "digest"
+    )
+  )
+  expect_identical(
+    names(q$pass1),
+    c(
+      "schema_version",
+      "method",
+      "settings",
+      "markers",
+      "transform",
+      "anchor",
+      "map",
+      "global_paired",
+      "local",
+      "software",
+      "created",
+      "parent_digest",
+      "digest"
+    )
+  )
+  expect_identical(
+    names(p),
+    c(
+      "schema_version",
+      "method",
+      "settings",
+      "markers",
+      "transform",
+      "population_levels",
+      "anchor",
+      "min_cells",
+      "known_batches",
+      "bridges",
+      "effects",
+      "targets",
+      "excluded",
+      "aliquot_source",
+      "software",
+      "created",
+      "parent_digest",
+      "digest"
+    )
+  )
+  expect_identical(q$schema_version, "bn_node_quantile_model/2")
+  expect_identical(p$schema_version, "bn_paired_model/2")
+})
+
+test_that("two fits on the same data give the same digest", {
+  d <- guard_sim()
+  a <- guard_fit(d)
+  Sys.sleep(1.1)
+  b <- guard_fit(d)
+  expect_false(identical(a$created, b$created))
+  expect_identical(a$digest, b$digest)
+})
+
+test_that("the fit does not depend on the collation locale", {
+  d <- guard_sim()
+  # Mixed-case ids sort differently in C and in most other locales.
+  d$samples$sample_id <- sub("^ref1", "Ref1", d$samples$sample_id)
+  d$x$sample_id <- sub("^ref1", "Ref1", d$x$sample_id)
+  old <- Sys.getlocale("LC_COLLATE")
+  on.exit(Sys.setlocale("LC_COLLATE", old))
+  Sys.setlocale("LC_COLLATE", "C")
+  a <- guard_fit(d)
+  ok <- Sys.setlocale("LC_COLLATE", "en_US.UTF-8")
+  skip_if(identical(ok, ""), "en_US.UTF-8 locale not available")
+  b <- guard_fit(d)
+  expect_identical(a$digest, b$digest)
+})
+
+test_that("seed must be a whole number", {
+  d <- guard_sim()
+  expect_error(
+    bn_fit(
+      d$x,
+      d$samples,
+      rep("T", nrow(d$x)),
+      markers = c("S", "M"),
+      transform = list(name = "asinh", cofactor = 5),
+      anchor = "b1",
+      grid = c(2, 1),
+      mapping_markers = "S",
+      seed = 1.7
+    ),
+    "whole number"
+  )
+})
+
+test_that("a model saved by 1.0.0 still loads, validates and applies", {
+  model <- bn_load(test_path("fixtures", "model-1.0.0.rds"))
+  d <- guard_sim()
+  res <- bn_apply(model, d$x, d$samples, rep("T", nrow(d$x)))
+  expect_equal(
+    res$x$M,
+    readRDS(test_path("fixtures", "model-1.0.0-M.rds")),
+    tolerance = 1e-12
+  )
 })

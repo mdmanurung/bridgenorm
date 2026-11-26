@@ -3,7 +3,7 @@
 # Ported from SpectraWeaveR R/corrector.R (frozen model, digest, save and load).
 
 # Version tag of the frozen model layout; bump when fields change.
-.bn_schema_version <- "bn_model/1"
+.bn_schema_version <- "bn_paired_model/2"
 
 # Fields every frozen model carries.
 .bn_model_fields <- c(
@@ -15,7 +15,6 @@
   "population_levels",
   "anchor",
   "min_cells",
-  "hierarchy",
   "known_batches",
   "bridges",
   "effects",
@@ -30,25 +29,42 @@
 
 # Package version, or NA when the code is sourced rather than installed.
 .bn_pkg_version <- function() {
-  tryCatch(as.character(utils::packageVersion("bridgenorm")), error = function(e) {
-    NA_character_
-  })
+  tryCatch(
+    as.character(utils::packageVersion("bridgenorm")),
+    error = function(e) {
+      NA_character_
+    }
+  )
 }
 
-# MD5 of a canonical text form of every field except the digest itself.
-# hexNumeric deparse keeps doubles exact, so the hash moves with any change.
+# Canonical form for the digest: plain lists and vectors with names, dim and dimnames only, no 'created'
+# timestamps, so a refit on the same data gives the same digest and package classes cannot move it.
+.bn_canonical <- function(x) {
+  if (is.data.frame(x)) {
+    x <- as.list(x)
+  }
+  if (is.list(x)) {
+    x <- unclass(x)
+    if (!is.null(names(x))) {
+      x <- x[names(x) != "created"]
+    }
+    return(lapply(x, .bn_canonical))
+  }
+  keep <- attributes(x)[intersect(
+    names(attributes(x)),
+    c("names", "dim", "dimnames")
+  )]
+  attributes(x) <- keep
+  x
+}
+
+# MD5 of the canonical form of every field except the digest itself; hexNumeric keeps doubles exact.
 .bn_digest <- function(model) {
   body <- unclass(model)
   body$digest <- NULL
   txt <- deparse(
-    body,
-    control = c(
-      "keepNA",
-      "keepInteger",
-      "niceNames",
-      "showAttributes",
-      "hexNumeric"
-    )
+    .bn_canonical(body),
+    control = c("keepNA", "keepInteger", "niceNames", "hexNumeric")
   )
   f <- tempfile(fileext = ".txt")
   on.exit(unlink(f))
@@ -63,7 +79,6 @@
   com,
   anchor,
   min_cells,
-  hierarchy,
   effects,
   targets,
   excluded
@@ -75,10 +90,12 @@
       settings = settings,
       markers = colnames(com$d$xm),
       transform = com$transform,
-      population_levels = sort(unique(com$d$cells$population)),
+      population_levels = sort(
+        unique(com$d$cells$population),
+        method = "radix"
+      ),
       anchor = anchor,
       min_cells = as.integer(min_cells),
-      hierarchy = hierarchy,
       known_batches = com$batches,
       bridges = com$bridges,
       effects = effects,
@@ -90,7 +107,7 @@
       parent_digest = NA_character_,
       digest = NA_character_
     ),
-    class = "bn_model"
+    class = c("bn_paired_model", "bn_model")
   )
   model$digest <- .bn_digest(model)
   model
@@ -98,8 +115,8 @@
 
 # Stop unless `model` has the current schema and an intact digest.
 .bn_validate <- function(model) {
-  if (!inherits(model, "bn_model")) {
-    stop("'model' must be a bn_model.", call. = FALSE)
+  if (!inherits(model, "bn_paired_model")) {
+    stop("'model' must be a bn_paired_model.", call. = FALSE)
   }
   absent <- setdiff(.bn_model_fields, names(model))
   if (length(absent) > 0) {
@@ -145,9 +162,9 @@
 }
 
 #' @export
-print.bn_model <- function(x, ...) {
+print.bn_paired_model <- function(x, ...) {
   cat(
-    "<bn_model>",
+    "<bn_paired_model>",
     x$method,
     "| anchor:",
     x$anchor,

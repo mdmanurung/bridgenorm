@@ -24,6 +24,9 @@
 #' \code{\link{bn_fit_paired}}.
 #'
 #' @inheritParams bn_fit
+#' @param transform Optional \code{list(name = "asinh", cofactor = <number>)}:
+#'   the scale \code{x} is on. It does not change the report; when given, it
+#'   is checked and stored as the \code{transform} attribute of the result.
 #' @return A tibble with one row per batch, population and marker.
 #' @seealso \code{\link{bn_fit}}, \code{\link{bn_bridges}}
 #' @export
@@ -32,7 +35,7 @@ bn_reference_noise <- function(
   samples,
   population,
   markers,
-  transform,
+  transform = NULL,
   min_cells = 50,
   sample_ids = NULL
 ) {
@@ -40,10 +43,11 @@ bn_reference_noise <- function(
     x = missing(x),
     samples = missing(samples),
     population = missing(population),
-    markers = missing(markers),
-    transform = missing(transform)
+    markers = missing(markers)
   ))
-  .bn_check_transform(transform)
+  if (!is.null(transform)) {
+    transform <- .bn_check_transform(transform)
+  }
   .bn_check_min_cells(min_cells)
   d <- .bn_cells(x, samples, population, markers, sample_ids)
   s <- .bn_summaries(d$xm, d$cells, as.integer(min_cells))$summ
@@ -99,11 +103,13 @@ bn_reference_noise <- function(
       .by = c("batch", "population", "marker")
     )
 
-  dplyr::left_join(
+  out <- dplyr::left_join(
     aliquot_level,
     loo,
     by = c("batch", "population", "marker"),
     relationship = "one-to-one"
   ) |>
     dplyr::arrange(.data$batch, .data$population, .data$marker)
+  attr(out, "transform") <- transform
+  out
 }

@@ -9,7 +9,7 @@ bn_reference_noise(
   samples,
   population,
   markers,
-  transform,
+  transform = NULL,
   min_cells = 50,
   sample_ids = NULL
 )
@@ -28,8 +28,9 @@ frozen before correction.}
 
 \item{markers}{Marker columns to correct.}
 
-\item{transform}{\code{list(name = "asinh", cofactor = <number>)}: the
-scale \code{x} is on. It is recorded, never applied.}
+\item{transform}{Optional \code{list(name = "asinh", cofactor = <number>)}:
+the scale \code{x} is on. It does not change the report; when given, it
+is checked and stored as the \code{transform} attribute of the result.}
 
 \item{min_cells}{Minimum cells per reference aliquot summary and per
 (batch, node) quantile table.}

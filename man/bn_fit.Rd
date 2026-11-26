@@ -16,14 +16,10 @@ bn_fit(
   seed,
   min_cells = 50,
   unbridged = "abstain",
-  method = "paired",
-  eb_settings = NULL,
   train_cells = 500,
   rlen = 100,
-  assignment = "nearest",
   fallback = "global",
   quantile_probs = seq(0.025, 0.975, length.out = 21),
-  tail = "shift",
   shrink_k = 300,
   target = "anchor",
   sample_ids = NULL
@@ -61,15 +57,9 @@ must be one of \code{markers}.}
 \item{unbridged}{\code{"abstain"} leaves a batch that shares no bridge
 donor with the anchor raw and flags it; \code{"stop"} refuses the fit.}
 
-\item{method}{Node estimator; only \code{"paired"}.}
-
-\item{eb_settings}{Only \code{NULL}; kept for future estimators.}
-
 \item{train_cells}{Maximum training cells per reference sample for the SOM.}
 
 \item{rlen}{Number of SOM training passes (\code{kohonen::som}).}
-
-\item{assignment}{How cells are assigned to nodes; only \code{"nearest"}.}
 
 \item{fallback}{For a (batch, node, marker) without a node effect:
 \code{"global"} takes the batch's global shift, \code{"abstain"} keeps
@@ -77,8 +67,6 @@ the raw value.}
 
 \item{quantile_probs}{Increasing probabilities in (0, 1), at least two,
 at which batch and anchor quantiles are matched.}
-
-\item{tail}{Rule beyond the outer quantiles; only \code{"shift"}.}
 
 \item{shrink_k}{Non-negative pseudo-count of cells for the shrinkage toward
 the batch-wide offset curve. Larger values borrow more; \code{0} turns
@@ -103,7 +91,8 @@ A \code{bn_node_quantile_model}: a list with
   \code{schema_version}, \code{settings}, \code{markers},
   \code{transform}, \code{anchor}, \code{pass1} and \code{pass2} (frozen
   node models), \code{quantiles} (one probabilities-by-markers matrix per
-  "batch\\rnode"), \code{software}, \code{created},
+  batch and node; the list names are internal keys), \code{software},
+  \code{created},
   \code{parent_digest} and \code{digest}.
 }
 \description{

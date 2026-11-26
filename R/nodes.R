@@ -1,7 +1,7 @@
 # Node-level correction (internal): .bn_fit_nodes(), the pass-1 and pass-2 model of bn_fit(), and its apply path.
 #
 
-.bn_node_schema_version <- "bn_node_model/1"
+.bn_node_schema_version <- "bn_node_model/2"
 
 #' Fit a node-level batch-correction model
 #'
@@ -113,14 +113,14 @@
     method,
     "method",
     "paired",
-    what = ".bn_fit_nodes"
+    what = "bn_fit"
   )
-  .bn_check_choice(assignment, "assignment", "nearest", what = ".bn_fit_nodes")
+  .bn_check_choice(assignment, "assignment", "nearest", what = "bn_fit")
   .bn_check_choice(
     fallback,
     "fallback",
     c("global", "abstain"),
-    what = ".bn_fit_nodes"
+    what = "bn_fit"
   )
   if (!is.null(eb_settings)) {
     stop("method = \"paired\" takes eb_settings = NULL.", call. = FALSE)
@@ -148,8 +148,13 @@
       )
     }
   }
-  if (!is.numeric(seed) || length(seed) != 1 || !is.finite(seed)) {
-    stop("'seed' must be one number.", call. = FALSE)
+  if (
+    !is.numeric(seed) ||
+      length(seed) != 1 ||
+      !is.finite(seed) ||
+      seed != round(seed)
+  ) {
+    stop("'seed' must be one whole number.", call. = FALSE)
   }
   absent <- setdiff(mapping_markers, colnames(x))
   if (length(absent) > 0) {
@@ -193,7 +198,6 @@
     do.call(bn_fit_paired, args)
   }
   global_paired <- fit_one("paired", pop_ref, unbridged)
-  global <- global_paired
 
   # Map: trained on reference cells after the global paired shift.
   mapped_ref <- .bn_node_mapping_data(
@@ -218,11 +222,22 @@
     },
     add = TRUE
   )
-  set.seed(seed)
+  set.seed(
+    seed,
+    kind = "Mersenne-Twister",
+    normal.kind = "Inversion",
+    sample.kind = "Rejection"
+  )
   train_rows <- unlist(
-    lapply(split(seq_along(ids_ref), ids_ref), function(i) {
-      i[sample.int(length(i), min(as.integer(train_cells), length(i)))]
-    }),
+    lapply(
+      split(
+        seq_along(ids_ref),
+        factor(ids_ref, levels = sort(unique(ids_ref), method = "radix"))
+      ),
+      function(i) {
+        i[sample.int(length(i), min(as.integer(train_cells), length(i)))]
+      }
+    ),
     use.names = FALSE
   )
   scaled <- scale(mapped_ref[train_rows, , drop = FALSE])
@@ -260,9 +275,7 @@
         train_cells = as.integer(train_cells),
         rlen = as.integer(rlen),
         seed = seed,
-        assignment = assignment,
         fallback = fallback,
-        eb_settings = eb_settings,
         target = target,
         # kohonen settings left at their defaults, recorded so the map can be rebuilt.
         som = list(
@@ -274,18 +287,17 @@
         )
       ),
       markers = markers,
-      transform = global$transform,
+      transform = global_paired$transform,
       anchor = anchor,
       map = map,
       global_paired = global_paired,
-      global = global,
       local = local,
       software = list(R = R.version.string, bridgenorm = .bn_pkg_version()),
       created = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
       parent_digest = NA_character_,
       digest = NA_character_
     ),
-    class = "bn_node_model"
+    class = c("bn_node_model", "bn_model")
   )
   model$digest <- .bn_digest(model)
   model
@@ -349,7 +361,6 @@
     )
   }
   .bn_validate(model$global_paired)
-  .bn_validate(model$global)
   .bn_validate(model$local)
   invisible(model)
 }
@@ -388,7 +399,7 @@
     sample_ids = ids
   )
   global <- .bn_apply(
-    model$global,
+    model$global_paired,
     x,
     samples,
     population,
@@ -461,14 +472,12 @@
     )
   }
 
+  # Rows of a node result are SOM nodes, not the caller's populations.
+  names(actions)[names(actions) == "population"] <- "node"
+
   # Keep the component models as bn_apply() returned them: they carry effects of new batches.
   updated <- model
   updated$global_paired <- mapping$model
-  updated$global <- if (model$method == "paired") {
-    mapping$model
-  } else {
-    global$model
-  }
   updated$local <- local$model
   if (!identical(updated, model)) {
     updated$parent_digest <- model$digest
@@ -482,7 +491,7 @@
         "%d (batch, node, marker) combination(s) cannot be corrected, e.g. %s / %s / %s: %s",
         nrow(ab),
         ab$batch[1],
-        ab$population[1],
+        ab$node[1],
         ab$marker[1],
         ab$reason[1]
       ),

@@ -43,7 +43,7 @@
     )
   }
   d <- .bn_cells(x, samples, population, markers, sample_ids)
-  batches <- sort(unique(d$cells$batch))
+  batches <- sort(unique(d$cells$batch), method = "radix")
   if (!anchor %in% batches) {
     stop(
       sprintf(

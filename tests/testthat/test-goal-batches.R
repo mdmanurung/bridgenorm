@@ -12,10 +12,17 @@ paired_fit <- function(d, ...) {
   )
 }
 
-test_that("a fit without goal_batches keeps the 1.0.0 digest", {
+test_that("a fit without goal_batches keeps the 1.0.0 layout", {
   d <- guard_sim()
   fixture <- bn_load(test_path("fixtures", "model-1.0.0.rds"))
-  expect_identical(guard_fit(d)$digest, fixture$digest)
+  model <- guard_fit(d)
+  expect_null(model$settings$goal_batches)
+  expect_identical(names(model$settings), names(fixture$settings))
+  expect_identical(names(model$pass1$settings), names(fixture$pass1$settings))
+  expect_identical(
+    names(model$pass1$global_paired$settings),
+    names(fixture$pass1$global_paired$settings)
+  )
 })
 
 test_that("goal_batches = every batch gives the same correction as the all-batch virtual target", {

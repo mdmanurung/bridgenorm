@@ -66,9 +66,12 @@
     .bn_canonical(body),
     control = c("keepNA", "keepInteger", "niceNames", "hexNumeric")
   )
+  # A binary connection writes "\n" line ends on every platform; text mode would write "\r\n" on Windows.
   f <- tempfile(fileext = ".txt")
   on.exit(unlink(f))
-  writeLines(txt, f, useBytes = TRUE)
+  con <- file(f, open = "wb")
+  writeLines(txt, con, sep = "\n", useBytes = TRUE)
+  close(con)
   unname(tools::md5sum(f))
 }
 

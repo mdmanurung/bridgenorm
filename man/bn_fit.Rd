@@ -22,6 +22,7 @@ bn_fit(
   quantile_probs = seq(0.025, 0.975, length.out = 21),
   shrink_k = 300,
   target = "anchor",
+  goal_batches = NULL,
   sample_ids = NULL
 )
 }
@@ -82,6 +83,14 @@ reference: per reference summary and per SOM node, the equal-weight mean
 over batches (for quantiles, the mean of the batches' quantile curves).
 It covers the same summaries and nodes as the anchor, which still sets
 the bridges and the map. Not combined with \code{shrink_k = "eb"}.}
+
+\item{goal_batches}{\code{NULL}, or with \code{target = "virtual"} two
+or more batches whose equal-weight mean is the goal (for example the
+batches of one study), as CytoNorm's goal distribution. Goal batches that
+are unbridged or whose reference donors differ from the anchor's are
+dropped. The anchor still sets the bridges and the map and may lie outside
+the goal; the fit stops when the goal lacks a reference summary the anchor
+has. Nodes without a goal quantile table take the pass-2 node shift.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}

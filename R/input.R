@@ -34,6 +34,37 @@
   value
 }
 
+# Stop unless goal_batches is NULL or two or more distinct batches of 'samples', with target = "virtual".
+.bn_check_goal_batches <- function(goal_batches, target, samples) {
+  if (is.null(goal_batches)) {
+    return(NULL)
+  }
+  if (!identical(target, "virtual")) {
+    stop("'goal_batches' needs target = \"virtual\".", call. = FALSE)
+  }
+  if (
+    !is.character(goal_batches) ||
+      length(goal_batches) < 2 ||
+      anyNA(goal_batches) ||
+      anyDuplicated(goal_batches) > 0
+  ) {
+    stop(
+      "'goal_batches' must be two or more distinct batch names; for one batch use target = \"anchor\".",
+      call. = FALSE
+    )
+  }
+  absent <- setdiff(goal_batches, as.character(samples$batch))
+  if (length(absent) > 0) {
+    stop(
+      "'goal_batches' not in 'samples': ",
+      paste(absent, collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+  sort(goal_batches, method = "radix")
+}
+
 # Stop unless target is "anchor" or "virtual".
 .bn_check_target <- function(target) {
   if (!identical(target, "anchor") && !identical(target, "virtual")) {

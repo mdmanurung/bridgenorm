@@ -92,6 +92,13 @@
 #'   over batches (for quantiles, the mean of the batches' quantile curves).
 #'   It covers the same summaries and nodes as the anchor, which still sets
 #'   the bridges and the map. Not combined with \code{shrink_k = "eb"}.
+#' @param goal_batches \code{NULL}, or with \code{target = "virtual"} two
+#'   or more batches whose equal-weight mean is the goal (for example the
+#'   batches of one study), as CytoNorm's goal distribution. Goal batches that
+#'   are unbridged or whose reference donors differ from the anchor's are
+#'   dropped. The anchor still sets the bridges and the map and may lie outside
+#'   the goal; the fit stops when the goal lacks a reference summary the anchor
+#'   has. Nodes without a goal quantile table take the pass-2 node shift.
 #' @param sample_ids Optional sample id per row; required for a matrix
 #'   \code{x}.
 #'
@@ -128,6 +135,7 @@ bn_fit <- function(
   quantile_probs = seq(0.025, 0.975, length.out = 21),
   shrink_k = 300,
   target = "anchor",
+  goal_batches = NULL,
   sample_ids = NULL
 ) {
   .bn_stop_missing(c(
@@ -175,6 +183,8 @@ bn_fit <- function(
     what = "bn_fit"
   )
   .bn_check_target(target)
+  samples <- .bn_check_samples(samples)
+  goal_batches <- .bn_check_goal_batches(goal_batches, target, samples)
   if (target == "virtual" && identical(shrink_k, "eb")) {
     stop("target = \"virtual\" does not take shrink_k = \"eb\".", call. = FALSE)
   }
@@ -214,7 +224,8 @@ bn_fit <- function(
       assignment = "nearest",
       fallback = fallback,
       sample_ids = ids_ref,
-      target = target
+      target = target,
+      goal_batches = goal_batches
     )
   }
   integrate_pass <- function(m, xp) {
@@ -322,12 +333,26 @@ bn_fit <- function(
     names(quantiles)
   )
   if (target == "virtual") {
-    by_node <- split(covered, node_of(covered))
+    # The goal: all batches with the anchor's donors, or the given goal batches among them (others dropped).
+    goal_used <- if (is.null(goal_batches)) {
+      same_donors
+    } else {
+      intersect(goal_batches, same_donors)
+    }
+    if (length(goal_used) == 0) {
+      stop(
+        "No goal batch has the anchor's reference donors after min_cells, so there is no goal to map to.",
+        call. = FALSE
+      )
+    }
+    goal_tables <- covered[sub("\r.*", "", covered) %in% goal_used]
+    by_node <- split(goal_tables, node_of(goal_tables))
     target_q <- lapply(by_node, \(gs) Reduce(`+`, quantiles[gs]) / length(gs))
     names(target_q) <- paste(.bn_virtual, names(by_node), sep = "\r")
-    target_batch_q <- Reduce(`+`, batch_q[same_donors]) / length(same_donors)
+    target_batch_q <- Reduce(`+`, batch_q[goal_used]) / length(goal_used)
     target_key <- \(g) paste(.bn_virtual, node_of(g), sep = "\r")
-    todo <- covered
+    # Nodes without a goal table take the pass-2 node shift.
+    todo <- covered[node_of(covered) %in% names(by_node)]
   } else {
     target_q <- quantiles
     target_batch_q <- batch_q[[anchor]]
@@ -400,6 +425,8 @@ bn_fit <- function(
     ),
     class = c("bn_node_quantile_model", "bn_model")
   )
+  # Stored only when given, so fits without a goal keep their 1.0.0 layout and digest.
+  model$settings$goal_batches <- goal_batches
   model$digest <- .bn_digest(model)
   model
 }

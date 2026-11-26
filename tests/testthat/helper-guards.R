@@ -63,7 +63,7 @@ guard_sim <- function(
   list(x = cells, samples = samples)
 }
 
-guard_fit <- function(d, min_cells = 50) {
+guard_fit <- function(d, min_cells = 50, ...) {
   bn_fit(
     d$x,
     d$samples,
@@ -76,6 +76,7 @@ guard_fit <- function(d, min_cells = 50) {
     seed = 1,
     train_cells = 300,
     rlen = 50,
-    min_cells = min_cells
+    min_cells = min_cells,
+    ...
   )
 }

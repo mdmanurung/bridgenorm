@@ -82,7 +82,8 @@
   assignment,
   fallback,
   sample_ids = NULL,
-  target = "anchor"
+  target = "anchor",
+  goal_batches = NULL
 ) {
   .bn_stop_missing(c(
     x = missing(x),
@@ -182,7 +183,7 @@
   x_ref <- x[ref_rows, , drop = FALSE]
   ids_ref <- d$cells$sample_id[ref_rows]
   pop_ref <- population[ref_rows]
-  fit_one <- function(fit_method, pop, unbridged_rule) {
+  fit_one <- function(fit_method, pop, unbridged_rule, lacking) {
     args <- list(
       x = x_ref,
       samples = samples,
@@ -193,11 +194,13 @@
       min_cells = min_cells,
       unbridged = unbridged_rule,
       target = target,
-      sample_ids = ids_ref
+      goal_batches = goal_batches,
+      sample_ids = ids_ref,
+      goal_lacking = lacking
     )
-    do.call(bn_fit_paired, args)
+    do.call(.bn_fit_paired, args)
   }
-  global_paired <- fit_one("paired", pop_ref, unbridged)
+  global_paired <- fit_one("paired", pop_ref, unbridged, "stop")
 
   # Map: trained on reference cells after the global paired shift.
   mapped_ref <- .bn_node_mapping_data(
@@ -264,7 +267,7 @@
   # Node fits: every reference cell labelled by its nearest node.
   node_ref <- map$labels[.bn_node_nearest(mapped_ref, map)]
   # Node fits abstain on batches without node summaries; the fallback covers them.
-  local <- fit_one(method, node_ref, "abstain")
+  local <- fit_one(method, node_ref, "abstain", "drop")
 
   model <- structure(
     list(
@@ -299,6 +302,8 @@
     ),
     class = c("bn_node_model", "bn_model")
   )
+  # Stored only when given, so fits without a goal keep their 1.0.0 layout and digest.
+  model$settings$goal_batches <- goal_batches
   model$digest <- .bn_digest(model)
   model
 }

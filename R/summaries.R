@@ -137,8 +137,15 @@
 }
 
 # Targets: the donor summaries of the anchor batch, or with target = "virtual" each summary's equal-weight
-# mean over batches, kept where the anchor has that summary so both targets cover the same cells.
-.bn_targets <- function(donor, anchor, target = "anchor") {
+# mean over the goal batches (all batches in 'donor' when goal is NULL), kept where the anchor has that summary
+# so both targets cover the same cells.
+.bn_targets <- function(
+  donor,
+  anchor,
+  target = "anchor",
+  goal = NULL,
+  lacking = "stop"
+) {
   anc <- donor[donor$batch == anchor, , drop = FALSE]
   if (nrow(anc) == 0) {
     stop(
@@ -147,9 +154,33 @@
     )
   }
   if (identical(target, "virtual")) {
-    key <- paste(donor$reference_id, donor$population, donor$marker, sep = "\r")
-    g <- split(seq_len(nrow(donor)), key)
-    g <- g[paste(anc$reference_id, anc$population, anc$marker, sep = "\r")]
+    pool <- if (is.null(goal)) {
+      donor
+    } else {
+      donor[donor$batch %in% goal, , drop = FALSE]
+    }
+    key <- paste(pool$reference_id, pool$population, pool$marker, sep = "\r")
+    g <- split(seq_len(nrow(pool)), key)
+    need <- paste(anc$reference_id, anc$population, anc$marker, sep = "\r")
+    # A goal without a summary the anchor has would give a NaN target: stop, or (node fits) drop that target
+    # so its cells take the fallback.
+    missing_keys <- setdiff(need, names(g))
+    if (length(missing_keys) > 0 && lacking == "drop") {
+      keep <- need %in% names(g)
+      anc <- anc[keep, , drop = FALSE]
+      need <- need[keep]
+    } else if (length(missing_keys) > 0) {
+      stop(
+        sprintf(
+          "The goal batches have no reference summary for %d (reference, population, marker) the anchor has, e.g. %s. Add goal batches that measure it, or put the anchor in 'goal_batches'.",
+          length(missing_keys),
+          gsub("\r", " / ", missing_keys[[1]], fixed = TRUE)
+        ),
+        call. = FALSE
+      )
+    }
+    g <- g[need]
+    donor <- pool
     anc$value <- vapply(g, function(ii) mean(sort(donor$value[ii])), numeric(1))
     anc$n_aliquots <- vapply(
       g,

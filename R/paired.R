@@ -64,7 +64,39 @@ bn_fit_paired <- function(
   min_cells = 50,
   unbridged = "abstain",
   target = "anchor",
+  goal_batches = NULL,
   sample_ids = NULL
+) {
+  .bn_fit_paired(
+    x,
+    samples,
+    population,
+    markers,
+    transform,
+    anchor,
+    min_cells,
+    unbridged,
+    target,
+    goal_batches,
+    sample_ids
+  )
+}
+
+# bn_fit_paired() with the rule for goal summaries the anchor has and the goal lacks: "stop" for user fits,
+# "drop" for the node fits inside bn_fit(), whose dropped nodes take the global fallback.
+.bn_fit_paired <- function(
+  x,
+  samples,
+  population,
+  markers,
+  transform,
+  anchor,
+  min_cells = 50,
+  unbridged = "abstain",
+  target = "anchor",
+  goal_batches = NULL,
+  sample_ids = NULL,
+  goal_lacking = "stop"
 ) {
   .bn_stop_missing(c(
     x = missing(x),
@@ -82,6 +114,7 @@ bn_fit_paired <- function(
   )
   .bn_check_target(target)
   samples <- .bn_check_samples(samples)
+  goal_batches <- .bn_check_goal_batches(goal_batches, target, samples)
   # Paired shift has no hierarchy; every batch sits in one study.
   hierarchy <- data.frame(
     batch = sort(unique(as.character(samples$batch))),
@@ -106,11 +139,13 @@ bn_fit_paired <- function(
   com$bridges <- .bn_bridges_after_min_cells(com$batches, s$summ, anchor)
   unbridged_batches <- .bn_gate(com$bridges, unbridged)
   donor <- .bn_donor_level(s$summ)
-  # Unbridged batches never shape a virtual target.
+  # Unbridged batches never shape a virtual target; goal batches that are unbridged are dropped.
   targets <- .bn_targets(
     donor[!donor$batch %in% unbridged_batches, , drop = FALSE],
     anchor,
-    target
+    target,
+    goal = goal_batches,
+    lacking = goal_lacking
   )
   effects <- .bn_paired_effects(donor, targets, "fit")
   if (target == "anchor") {
@@ -119,7 +154,10 @@ bn_fit_paired <- function(
   effects <- effects[!effects$batch %in% unbridged_batches, , drop = FALSE]
   .bn_freeze(
     "paired_shift",
-    list(unbridged = unbridged, target = target),
+    c(
+      list(unbridged = unbridged, target = target),
+      if (!is.null(goal_batches)) list(goal_batches = goal_batches)
+    ),
     com,
     anchor,
     min_cells,

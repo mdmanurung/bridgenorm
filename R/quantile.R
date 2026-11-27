@@ -428,15 +428,16 @@ bn_fit <- function(
     if (shrink_reweight) {
       share <- prop.table(table(ref_batch, nodes), 1)
       share_target <- colMeans(share[target_share_of, , drop = FALSE])
-      batch_curve <- lapply(
-        stats::setNames(nm = names(batch_q)),
-        \(b) {
-          i <- which(ref_batch == b)
-          w <- share_target[as.character(nodes[i])] /
-            share[b, as.character(nodes[i])]
-          .bn_weighted_table(x1m[i, , drop = FALSE], w, quantile_probs)
-        }
-      )
+      # Only the batches the shrinkage reads: those with tables to shrink and those that make the target.
+      need <- unique(c(sub("\r.*", "", todo), target_share_of))
+      batch_curve[need] <- lapply(need, \(b) {
+        i <- which(ref_batch == b)
+        w <- share_target[as.character(nodes[i])] /
+          share[b, as.character(nodes[i])]
+        .bn_weighted_table(x1m[i, , drop = FALSE], w, quantile_probs, batch_q[[b]])
+      })
+      # The target's batch-wide curve from the same reweighted curves, so both sides share one cell-state mix.
+      target_batch_q <- Reduce(`+`, batch_curve[target_share_of]) / length(target_share_of)
     }
     shrunk <- quantiles
     for (g in todo) {
@@ -510,9 +511,16 @@ bn_fit <- function(
 
 # Quantile table of the rows of xm with cell weights w (weighted empirical quantile function, linear between the
 # midpoints of the cumulative weight); same shape as q_table() in bn_fit().
-.bn_weighted_table <- function(xm, w, probs) {
+.bn_weighted_table <- function(xm, w, probs, fallback = NULL) {
   w <- as.numeric(w)
   keep <- is.finite(w) & w > 0
+  # Fewer than two cells with weight (a batch only in nodes the target lacks): return the fallback table.
+  if (sum(keep) < 2) {
+    if (is.null(fallback)) {
+      stop("Fewer than two cells with positive weight.", call. = FALSE)
+    }
+    return(fallback)
+  }
   xm <- xm[keep, , drop = FALSE]
   w <- w[keep]
   q <- apply(xm, 2, \(v) {

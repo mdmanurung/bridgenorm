@@ -101,3 +101,46 @@ test_that("weighted tables with equal weights match the unweighted quantiles", {
   heavy <- bridgenorm:::.bn_weighted_table(xm, ifelse(xm[, "M"] > 0, 3, 1), 0.5)
   expect_gt(heavy[1, "M"], 0)
 })
+
+test_that("a weighted table with fewer than two weighted cells returns the fallback", {
+  xm <- cbind(M = c(1, 2, 3))
+  fb <- matrix(9, 2, 1, dimnames = list(NULL, "M"))
+  expect_identical(
+    bridgenorm:::.bn_weighted_table(xm, c(0, 0, NA), c(0.25, 0.75), fb),
+    fb
+  )
+  expect_error(
+    bridgenorm:::.bn_weighted_table(xm, c(0, 0, 1), c(0.25, 0.75)),
+    "positive weight"
+  )
+})
+
+test_that("with reweighting, batches that differ only in cell-state mix are left in place", {
+  # No batch effect; the batches differ only in their share of state A (0.8, 0.5, 0.2). The batch-wide curves
+  # and the target curve must be compared at one cell-state mix, or the shrinkage moves aligned cells.
+  set.seed(3)
+  batches <- c("b1", "b2", "b3")
+  share_a <- c(b1 = 0.8, b2 = 0.5, b3 = 0.2)
+  samples <- data.frame(
+    sample_id = c(outer(c("ref1", "ref2", "s1"), batches, paste, sep = "_")),
+    batch = rep(batches, each = 3),
+    reference_id = rep(c("donor", "donor", NA), 3),
+    aliquot = rep(c("ref1", "ref2", NA), 3)
+  )
+  x <- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {
+    n_a <- round(600 * share_a[[samples$batch[i]]])
+    data.frame(
+      sample_id = samples$sample_id[i],
+      S = c(stats::rnorm(n_a, 1, 0.2), stats::rnorm(600 - n_a, 4, 0.2)),
+      M = c(stats::rnorm(n_a, 2, 0.3), stats::rnorm(600 - n_a, 0.5, 0.3))
+    )
+  }))
+  pop <- rep("T", nrow(x))
+  for (target in c("anchor", "virtual")) {
+    m <- bn_fit(x, samples, pop, markers = c("S", "M"), transform = list(name = "asinh", cofactor = 5),
+      anchor = "b1", grid = c(2, 1), mapping_markers = "S", seed = 1, train_cells = 300, rlen = 50,
+      target = target, shrink_k = 1e6, shrink_target = "value", shrink_reweight = TRUE)
+    out <- bn_apply(m, x, samples, pop)$x
+    expect_lt(median(abs(out$M - x$M)), 0.05)
+  }
+})

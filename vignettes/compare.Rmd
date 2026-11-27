@@ -275,6 +275,34 @@ Points are the `r lg_rep` replicates; bars are their mean; dashed lines mark the
 
 **A batch term in the downstream model does not repair it.** With visit and batch confounded, a batch term cannot separate drift from time; in the staggered designs it recovers only a little. The protection is in the design: keep one bridge lot, check it for drift, and spread each subject's visits over batches.
 
+## Variance left to batch
+
+```{r batchvaria}
+bv <- read.csv("compare-data/batchvaria.csv")
+bv <- bv[bv$feature_set == "pop_median", ]
+bv_methods <- c("uncorrected", "oracle", "paired", "bridgenorm_v100", "bridgenorm", "CytoNorm", "CytoNorm_anchor",
+  "cyCombine", "cyCombine_covar")
+bv_scenarios <- c(
+  global_balanced = "Global shift, balanced", global_confounded = "Global shift, confounded",
+  calibrated_balanced = "Calibrated, balanced", calibrated_confounded = "Calibrated, confounded",
+  long_staggered = "Longitudinal, staggered", long_blocked = "Longitudinal, visit = batch",
+  long_blocked_bridge_drift = "Longitudinal, visit = batch + bridge drift"
+)
+bv_pct <- function(sc, m) sprintf("%.1f", bv$batch_pct[bv$scenario == sc & bv$method == m])
+bv_table <- sapply(bv_methods, function(m) {
+  sapply(names(bv_scenarios), function(sc) {
+    v <- bv$batch_pct[bv$scenario == sc & bv$method == m]
+    if (length(v) == 1) sprintf("%.1f", v) else ""
+  })
+})
+dimnames(bv_table) <- list(bv_scenarios, labels[bv_methods])
+knitr::kable(bv_table, align = "r")
+```
+
+A second check uses the BatchVaria package, which splits the variance of per-sample features into the share explained by batch, by the condition (or by visit and subject in the longitudinal designs), and the rest. The table gives the percent of variance explained by batch, for the median of each marker in each simulated population of the study samples, as the mean over three simulation seeds; lower is better. The no-batch-effect column is the floor: samples differ by chance, so batch explains a little even without a batch effect. The script is `tools/eval-batchvaria.R`; it also scores the medians in each node of a shared 5 by 5 SOM, with the same order of methods.
+
+bridgenorm with the 1.0.0 defaults and CytoNorm leave about the same share. The 1.1.0 defaults leave slightly more in every scenario (`r bv_pct("calibrated_balanced", "bridgenorm")` against `r bv_pct("calibrated_balanced", "bridgenorm_v100")` percent under the calibrated batch effect), in line with their higher error against the truth. cyCombine falls below the floor (`r bv_pct("global_balanced", "cyCombine")` against `r bv_pct("global_balanced", "oracle")` percent under the global shift): it is fitted on the study samples, so it likely removes chance differences between batches along with the batch effect.
+
 ## Limits of this comparison
 
 - The simulation was written by the bridgenorm author and follows bridgenorm's design: one reference donor in every batch, and an anchor batch without batch effect. Its batch effects are shifts and linear stretches within populations.

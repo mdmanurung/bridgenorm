@@ -1,15 +1,17 @@
 # Shrinkage options of bn_fit(): shrink_target, shrink_reweight, quantile_maps.
 
-test_that("the new options default to the 1.0.0 behaviour and leave its layout and digest", {
+test_that("the defaults are shrink_target = \"value\" and shrink_k = 1000, and are recorded", {
   d <- guard_sim()
   base <- guard_fit(d)
   same <- guard_fit(
     d,
-    shrink_target = "quantile",
+    shrink_k = 1000,
+    shrink_target = "value",
     shrink_reweight = FALSE,
     quantile_maps = TRUE
   )
-  expect_null(base$settings$shrink_target)
+  expect_identical(base$settings$shrink_target, "value")
+  expect_identical(base$settings$shrink_k, 1000)
   expect_null(base$settings$shrink_reweight)
   expect_null(base$settings$quantile_maps)
   expect_identical(same$digest, base$digest)

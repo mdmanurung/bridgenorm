@@ -1,3 +1,25 @@
+# bridgenorm 1.1.0
+
+## Default changes
+
+* `bn_fit()` now defaults to `shrink_target = "value"` and `shrink_k = 1000` (1.0.0: `"quantile"` and 300).
+  Corrected values change for every fit that relied on the defaults; pass `shrink_target = "quantile",
+  shrink_k = 300` to reproduce 1.0.0. Models saved by 1.0.0 still load and apply unchanged.
+* The new defaults were chosen by tuning on two real multi-batch cytometry studies, scored by the earth
+  mover's distance between batches on held-out bridge wells. The comparison used every fold, including
+  those used to pick the settings, so the gain is an upper bound. Check the defaults on new data.
+* `settings$shrink_target` is now always recorded. A model without it used `"quantile"`.
+
+## New
+
+* `bn_fit(shrink_target = )`: `"value"` shrinks each node's offset curve toward the batch-wide map
+  evaluated at the node's own target quantiles, so an intensity-dependent effect shared by all nodes is not
+  shrunk toward a wrong curve. `"quantile"` keeps the 1.0.0 rule.
+* `bn_fit(shrink_reweight = TRUE)` computes the batch-wide curve with weights that give each batch the
+  target's cell-state mix of bridge cells. Default `FALSE`.
+* `bn_fit(quantile_maps = FALSE)` keeps no quantile tables, so every cell takes the pass-2 node shift (an
+  ablation). Default `TRUE`.
+
 # bridgenorm 1.0.0
 
 The model contract is now stable: exported functions, model classes, schema strings and the columns of

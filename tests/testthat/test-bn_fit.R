@@ -57,7 +57,9 @@ fit_quantile_sim <- function(s, ...) {
       seed = 473,
       fallback = "global",
       quantile_probs = seq(0.025, 0.975, length.out = 21),
-      shrink_k = 0
+      shrink_k = 0,
+      # The formula tests below check the 1.0.0 shrinkage rule; the 1.1.0 default "value" has its own tests.
+      shrink_target = "quantile"
     ),
     list(...)
   )
@@ -189,7 +191,8 @@ test_that("the defaults are the benchmarked settings", {
     unbridged = "abstain",
     train_cells = 500,
     rlen = 100,
-    shrink_k = 300
+    shrink_k = 1000,
+    shrink_target = "value"
   )
   defaults <- bn_fit(
     x = s$x[, c("sample_id", "Lin", "M")],

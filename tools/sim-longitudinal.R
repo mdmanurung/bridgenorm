@@ -293,6 +293,25 @@ if (args[[1]] == "run") {
     MARKERS
   ])
 
+  # bridgenorm_v100: the 1.0.0 defaults (shrink_target "quantile", shrink_k 300), to show the 1.1.0 change.
+  out$bridgenorm_v100 <- as.matrix(bn_apply(
+    bn_fit(
+      x = x[is_fit_ref, c("sample_id", MARKERS)],
+      samples = fit_samples,
+      population = population[is_fit_ref],
+      markers = MARKERS,
+      transform = transform,
+      anchor = BATCHES[[1]],
+      grid = GRID,
+      mapping_markers = MARKERS,
+      seed = tk$som_seed,
+      shrink_k = 300,
+      shrink_target = "quantile"
+    ),
+    all_x,
+    fit_samples,
+    population
+  )$x[MARKERS])
   out$bridgenorm_k0 <- as.matrix(bn_apply(
     bn_fit(
       x = x[is_fit_ref, c("sample_id", MARKERS)],

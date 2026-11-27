@@ -17,7 +17,8 @@ PRIVATE <- c(
   "plans/",
   "/exports/",
   "\\bCD[0-9]+",
-  "\\b(LG|ZS|NS|RV|VC|RL)[0-9]+[a-z]?\\b"
+  "\\b(LG|ZS|NS|RV|VC|RL|OP|BV|GB|GD)[0-9]+[a-z]?\\b",
+  "\\bP2[a-e]\\b"
 )
 PRIVATE_FILE <- "experiments/leak-patterns.txt" # one extended regex per line; absent on other machines
 PUBLIC <- c(

@@ -1,7 +1,7 @@
 Package: bridgenorm
 Title: Cytometry Batch Correction from Bridge Samples
-Version: 1.0.0
-Date: 2026-11-26
+Version: 1.1.0
+Date: 2026-11-27
 Authors@R:
     person("M. D.", "Manurung", email = "m.d.manurung@lumc.nl", role = c("aut", "cre"))
 Description: Estimates technical batch effects in flow cytometry data from bridge

@@ -20,10 +20,13 @@ bn_fit(
   rlen = 100,
   fallback = "global",
   quantile_probs = seq(0.025, 0.975, length.out = 21),
-  shrink_k = 300,
+  shrink_k = 1000,
   target = "anchor",
   goal_batches = NULL,
-  sample_ids = NULL
+  sample_ids = NULL,
+  shrink_target = "value",
+  shrink_reweight = FALSE,
+  quantile_maps = TRUE
 )
 }
 \arguments{
@@ -94,6 +97,25 @@ has. Nodes without a goal quantile table take the pass-2 node shift.}
 
 \item{sample_ids}{Optional sample id per row; required for a matrix
 \code{x}.}
+
+\item{shrink_target}{What each node's offset curve is shrunk toward.
+\code{"value"} (default since 1.1.0) evaluates the batch-wide map (the
+batch's quantile function composed with the target's distribution
+function) at the node's own target quantiles, so an intensity-dependent
+effect that is the same in every node is not shrunk toward a wrong curve.
+Beyond the outer batch-wide quantiles the map moves by their difference.
+\code{"quantile"} (the 1.0.0 behaviour) adds the batch-wide offset at the
+same probability, which equals the node's offset only under a pure
+location shift. The value is stored in \code{settings$shrink_target}.}
+
+\item{shrink_reweight}{\code{FALSE} (default), or \code{TRUE} to compute the
+batch-wide curve with cell weights that give the batch the target's
+share of reference cells in every second-pass node (the anchor's, or with
+\code{target = "virtual"} the mean over the goal batches). It matters when
+a batch's bridge samples have a different cell-state mix than the target's.}
+
+\item{quantile_maps}{\code{TRUE} (default), or \code{FALSE} to keep no
+quantile tables, so every cell takes the pass-2 node shift (an ablation).}
 }
 \value{
 A \code{bn_node_quantile_model}: a list with
@@ -156,7 +178,8 @@ node shift.
 
 The defaults come from benchmarking: \code{min_cells = 50},
 \code{train_cells = 500}, \code{rlen = 100}, 21 quantiles from 0.025 to
-0.975, \code{shrink_k = 300}. Check them on new data. \code{grid},
+0.975, \code{shrink_k = 1000} with \code{shrink_target = "value"} (since
+1.1.0; 1.0.0 used 300 and \code{"quantile"}). Check them on new data. \code{grid},
 \code{mapping_markers}, \code{anchor} and \code{seed} have no default.
 }
 

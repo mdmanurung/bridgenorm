@@ -253,7 +253,7 @@ run_methods <- function(sim, som_seed) {
     seed = som_seed,
     shrink_k = 0
   )
-  # bridgenorm_v100: the 1.0.0 defaults (shrink_target "quantile", shrink_k 300), to show the 1.1.0 change (OP22).
+  # bridgenorm_v100: the 1.0.0 defaults (shrink_target "quantile", shrink_k 300), to show the 1.1.0 change.
   out$bridgenorm_v100 <- as.matrix(bn_apply(
     bn_fit(
       x = x[is_fit_ref, c("sample_id", MARKERS)],

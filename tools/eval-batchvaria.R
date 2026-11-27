@@ -1,4 +1,4 @@
-# Purpose: Judge batch correction on the public simulations with BatchVaria 1.0.0. Decisions BV1-BV4. Two steps:
+# Purpose: Judge batch correction on the public simulations with BatchVaria 1.0.0. Two steps:
 #          "simulate" (R 4.5) simulates, corrects with every arm and writes per-sample feature tables;
 #          "evaluate" (R 4.6) builds one SummarizedExperiment per scenario and seed (features x study samples,
 #          one assay per arm) and runs BatchVaria. Three feature sets are reported side by side: per-sample
@@ -7,7 +7,7 @@
 #          frequencies (true labels, so no-op under correction: a control).
 #          Cross-sectional: the 4 scenarios of tools/sim-compare.R, design ~ batch + condition.
 #          Longitudinal: the simulation of tools/sim-longitudinal.R (staggered, blocked, blocked_bridge_drift,
-#          calibrated), design ~ batch + timepoint + subject (BV3).
+#          calibrated), design ~ batch + timepoint + subject.
 # Run:     R 4.5 (R_LIBS = bridgenorm100 + 4.5 library), package root, as a job array over tasks 1-21:
 #            Rscript tools/eval-batchvaria.R simulate <task> <run_dir>
 #          R 4.6 (conda env R46_bioc324 first on PATH, LD_LIBRARY_PATH to its lib, R_LIBS unset):
@@ -36,13 +36,13 @@ SOM_SEED <- 473 # SOM seed of every method and of the shared SOM
 # Side lengths of the square shared-SOM grids saved (8 = the methods' grid, GRID in tools/sim-compare.R). A sample with
 # no cell in a node has no median there, and BatchVaria needs a full features x samples matrix, so a node-marker
 # feature is kept only if every study sample has cells in that node in every arm. The evaluate step uses the finest
-# 5x5 grid (BV5, user choice); node_grid_check.csv reports how many node-marker features each grid keeps.
+# 5x5 grid; node_grid_check.csv reports how many node-marker features each grid keeps.
 SHARED_SOM_SIDES <- c(8, 6, 5, 4, 3)
-NODE_GRID_SIDE <- 5 # BV5: the shared-SOM grid used for node_median
+NODE_GRID_SIDE <- 5 # the shared-SOM grid used for node_median
 SHARED_SOM_TRAIN_CELLS <- 500 # cells per sample, bridgenorm's default train_cells
 SHARED_SOM_RLEN <- 100 # SOM passes, bridgenorm's default rlen
 CROSS_FORMULA <- ~ batch + condition
-LONG_FORMULA <- ~ batch + timepoint + subject # BV3; fall back to ~ batch + timepoint if BatchVaria rejects it
+LONG_FORMULA <- ~ batch + timepoint + subject # fall back to ~ batch + timepoint if BatchVaria rejects it
 BASELINE <- "uncorrected"
 EFFECT_FEATURE <- "P3|M05" # the one feature with a true group effect (EFFECT_POP, EFFECT_MARKER in tools/sim-compare.R)
 FEATURE_SETS <- c("pop_median", "node_median", "pop_freq") # node_median = the chosen grid

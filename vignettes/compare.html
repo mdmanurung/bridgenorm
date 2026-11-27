@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>Compare with CytoNorm and cyCombine on simulated data – bridgenorm</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b626d73c4c936ccc3cb08be7d45d1df6.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-cbf1fd589b2feeb3da8b94d52fd10830.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-8394ba2926a69b74b325d882636bf2b7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cbf1fd589b2feeb3da8b94d52fd10830.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light"><script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+</head>
+<body class="nav-sidebar floating nav-fixed fullcontent quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top"><nav class="navbar navbar-expand-lg " data-bs-theme="dark"><div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">bridgenorm</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+<li class="nav-item">
+    <a class="nav-link active" href="../index.html" aria-current="page"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../vignettes/bridgenorm.html"> 
+<span class="menu-text">Get started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-articles" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Articles</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-articles">
+<li>
+    <a class="dropdown-item" href="../vignettes/bridgenorm.html">
+ <span class="dropdown-text">Use case 1: Correct batches with bridge samples</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../vignettes/goal-distribution.html">
+ <span class="dropdown-text">Use case 2: Normalize toward a goal distribution</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../vignettes/frozen-model.html">
+ <span class="dropdown-text">Use case 3: Correct later batches with a frozen model</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../vignettes/compare.html">
+ <span class="dropdown-text">Compare with CytoNorm and cyCombine</span></a>
+  </li>  
+    </ul>
+</li>
+  <li class="nav-item">
+    <a class="nav-link" href="../man/bn_fit.html"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../NEWS.html"> 
+<span class="menu-text">News</span></a>
+  </li>  
+</ul>
+<ul class="navbar-nav navbar-nav-scroll ms-auto">
+<li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/mdmanurung/bridgenorm"> <i class="bi bi-github" role="img" aria-label="bridgenorm GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+</div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav><nav class="quarto-secondary-nav"><div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../vignettes/bridgenorm.html">Articles</a></li><li class="breadcrumb-item"><a href="../vignettes/compare.html">Compare with CytoNorm and cyCombine on simulated data</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav></header><!-- content --><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto"><div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Articles</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../vignettes/bridgenorm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Use case 1: Correct batches with bridge samples</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../vignettes/compare.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Compare with CytoNorm and cyCombine on simulated data</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../vignettes/frozen-model.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Use case 3: Correct later batches with a frozen model</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../vignettes/goal-distribution.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Use case 2: Normalize toward a goal distribution</span></a>
+  </div>
+</li>
+      </ul>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text">Reference</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../man/bn_apply.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bn_apply</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../man/bn_bridges.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bn_bridges</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../man/bn_fit_paired.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bn_fit_paired</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../man/bn_fit.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bn_fit</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../man/bn_reference_noise.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bn_reference_noise</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../man/bn_save.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">bn_save</span></a>
+  </div>
+</li>
+      </ul>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../NEWS.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">News</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../LICENSE.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">License</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../CITATION.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Citation</span></a>
+  </div>
+</li>
+    </ul>
+</div>
+</nav><div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../vignettes/bridgenorm.html">Articles</a></li><li class="breadcrumb-item"><a href="../vignettes/compare.html">Compare with CytoNorm and cyCombine on simulated data</a></li></ol></nav><div class="quarto-title">
+<h1 class="title">Compare with CytoNorm and cyCombine on simulated data</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header><p>This article compares bridgenorm with two widely used batch-correction tools, <a href="https://github.com/saeyslab/CytoNorm">CytoNorm</a> and <a href="https://github.com/biosurf/cyCombine">cyCombine</a>, on simulated data where the truth is known. The study design and the size of the batch effects are set to realistic values for a multi-batch cytometry study with bridge samples. The methods were run once with the script <code>tools/sim-compare.R</code> in the package repository; the article reads its saved results, so building it does not need CytoNorm or cyCombine.</p>
+<section id="simulated-data" class="level2"><h2 class="anchored" data-anchor-id="simulated-data">Simulated data</h2>
+<p>Each data set has 15 batches. The first batch is the anchor and carries no batch effect. Every batch holds 3 (2 fit, 1 held out) bridge aliquots of one reference donor and 12 study samples from different donors, with 5000 cells per sample. Cells come from 8 populations measured on 24 markers. Study donors differ in population mix and carry small marker offsets. Cases carry a known condition effect: +0.4 on M05 in population P3.</p>
+<p>Two kinds of batch effect are simulated:</p>
+<ul>
+<li>
+<strong>Global shift</strong>: one shift per batch and marker, the same for every cell. Its size varies by marker; the median standard deviation over batches is 0.084.</li>
+<li>
+<strong>Calibrated</strong>: the global shift plus, per batch, population and marker, a further shift (median SD 0.1) and a stretch or compression of the distribution (median SD of the log scale factor 0.236). The batch effect then differs between cell states and changes the shape of the distributions. The three spreads were measured on bridge wells of an unpublished multi-batch study with bridgenorm at <code>shrink_k = 0</code>; the scale spread is an upper estimate, because it also holds sampling noise.</li>
+</ul>
+<p>And two study designs:</p>
+<ul>
+<li>
+<strong>Balanced</strong>: six cases and six controls in every batch.</li>
+<li>
+<strong>Confounded</strong>: from 1 to 11 cases per batch (1, 2, 2, 3, 4, 5, 5, 6, 7, 7, 8, 9, 10, 10, 11), so condition and batch overlap.</li>
+</ul>
+<p>That makes four scenarios, each simulated with ten seeds; every simulated data set is corrected with three SOM seeds, so each method has 30 replicates per scenario. A last arm keeps the simulated values without batch effect: the floor that sampling noise sets for every score.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 78%">
+</colgroup>
+<thead><tr class="header">
+<th style="text-align: left;">Setting</th>
+<th style="text-align: left;">Value</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">simulation seeds</td>
+<td style="text-align: left;">1, 2, 3, 4, 5, 6, 7, 8, 9, 10</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SOM seeds</td>
+<td style="text-align: left;">473, 474, 475</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">batches</td>
+<td style="text-align: left;">15</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">bridge aliquots per batch</td>
+<td style="text-align: left;">3 (2 fit, 1 held out)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">study samples per batch</td>
+<td style="text-align: left;">12</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">cells per sample</td>
+<td style="text-align: left;">5000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">markers</td>
+<td style="text-align: left;">24</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">populations</td>
+<td style="text-align: left;">8</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">effect</td>
+<td style="text-align: left;">+0.4 on M05 in population P3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">cases per batch (balanced)</td>
+<td style="text-align: left;">6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">cases per batch (confounded)</td>
+<td style="text-align: left;">1, 2, 2, 3, 4, 5, 5, 6, 7, 7, 8, 9, 10, 10, 11</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">global shift SD per marker (median)</td>
+<td style="text-align: left;">0.084</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">state-specific shift SD per marker (median)</td>
+<td style="text-align: left;">0.1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">log scale SD per marker (median)</td>
+<td style="text-align: left;">0.236</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SOM grid (all methods)</td>
+<td style="text-align: left;">8x8</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">bridgenorm</td>
+<td style="text-align: left;">bridgenorm 1.1.0, defaults, all markers mapped</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">CytoNorm</td>
+<td style="text-align: left;">CytoNorm 2.0.10, FlowSOM nCells = 1e+06, xdim = 8, ydim = 8, nClus = 10, scale = FALSE; defaults except the grid; CytoNorm_anchor sets normParams goal to b01</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">cyCombine</td>
+<td style="text-align: left;">cyCombine 0.3.0, defaults (8x8); run twice: no covariate, and the true condition as covariate</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section><section id="methods-and-settings" class="level2"><h2 class="anchored" data-anchor-id="methods-and-settings">Methods and settings</h2>
+<p>All methods use the same 8 by 8 self-organising map grid; otherwise each runs with its package defaults. bridgenorm and CytoNorm are fitted on two of the three bridge aliquots of every batch; the third is held out for scoring. cyCombine has no separate apply step; it is fitted on and corrects all cells, study samples and the held-out aliquot included, as it is designed to. cyCombine runs twice: with its default of no covariate, and with the true condition (case or control) as covariate, which is what its documentation suggests when the condition is known. That second run uses labels that the bridge-based methods never see. The paired shift (<code>bn_fit_paired()</code>, one shift per batch and marker) is the baseline.</p>
+</section><section id="how-the-methods-are-scored" class="level2"><h2 class="anchored" data-anchor-id="how-the-methods-are-scored">How the methods are scored</h2>
+<ul>
+<li>
+<strong>Held-out bridge EMD</strong> measures how much batch effect is left. The held-out bridge aliquot is the same donor in every batch, so after a perfect correction its distributions match across batches. Per marker, the score takes the largest one-dimensional earth mover’s distance between any two of the 15 batches, then the median over markers. Lower is better. Sampling noise alone keeps the score above zero.</li>
+<li>
+<strong>Condition-effect recovery</strong> measures whether biology survives. Per study sample, the median of the effect marker in the effect population is taken; the effect is the mean of cases minus the mean of controls, with no batch term. The figures show the estimate divided by the true effect, so 1 means the effect is kept.</li>
+</ul></section><section id="batch-effect-left-after-correction" class="level2"><h2 class="anchored" data-anchor-id="batch-effect-left-after-correction">Batch effect left after correction</h2>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="compare_files/figure-html/emd-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Points are the 30 replicates; bars are their mean. The design changes only the study samples, so the bridge-based scores repeat across the two designs.</p>
+<p><strong>Global shift.</strong> CytoNorm (0.048), bridgenorm (0.052) and the paired shift (0.054) bring the held-out EMD down from 0.298 to nearly the same level; cyCombine leaves slightly more (0.056). A global shift is what the paired shift is built for, so the node-level methods gain little here.</p>
+<p><strong>Calibrated batch effect.</strong> The paired shift now falls behind (0.144), because one shift per batch and marker cannot follow effects that differ between cell states. CytoNorm leaves the least (0.049), then bridgenorm (0.058) and cyCombine (0.073 without, 0.069 with the covariate). CytoNorm and bridgenorm both learn per-cluster quantile maps from the bridge samples. bridgenorm also pulls each node’s map toward the batch-wide map: with about 150 bridge cells per node here and the default <code>shrink_k = 1000</code>, a node keeps about an eighth of its own map. That explains part of why it leaves more of the cell-state-specific effect than CytoNorm: with <code>shrink_k = 0</code>, the held-out EMD here falls to 0.052.</p>
+<p>The defaults changed in bridgenorm 1.1.0, from shrinkage toward the batch-wide curve at the same quantile with <code>shrink_k = 300</code> (“bridgenorm 1.0.0” in the figures) to shrinkage toward the batch-wide map at the same value with <code>shrink_k = 1000</code>. They were chosen by tuning on held-out bridge wells of two real studies, which are not public. In these simulations the change is a trade-off. Under the calibrated batch effect, the 1.1.0 defaults lower the held-out EMD (from 0.066 to 0.058, lower in 30 of 30 replicates), but raise the error of study cells against their values without batch effect (from 0.067 to 0.071, higher in 30 of 30). Under the global shift the two scores move the other way, and less. Counting a win only when a method is better in every replicate, CytoNorm beats bridgenorm on held-out EMD under the calibrated batch effect: it is lower in 30 of 30 replicates.</p>
+</section><section id="biology-kept-after-correction" class="level2"><h2 class="anchored" data-anchor-id="biology-kept-after-correction">Biology kept after correction</h2>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="compare_files/figure-html/effect-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Balanced design.</strong> With the condition balanced within every batch, a batch effect does not bias the case-control difference much, and every method stays close to the truth.</p>
+<p><strong>Confounded design.</strong> Here cases sit mostly in some batches, so any batch effect left in the data, or any biology removed as batch effect, biases the estimate.</p>
+<ul>
+<li>Under the calibrated batch effect, the uncorrected estimate is 0.88 to 1.27 times the true effect. bridgenorm (0.96 to 1.12) and CytoNorm (0.97 to 1.14) bring it near 1; the paired shift less so (0.91 to 1.20).</li>
+<li>cyCombine without a covariate shrinks the effect (0.68 to 0.86 under the global shift, 0.78 to 1.07 under the calibrated one). It is fitted on the study samples, and when cases cluster in some batches, part of the case effect looks like batch effect and is removed.</li>
+<li>With the true condition as covariate, cyCombine keeps the effect (0.89 to 1.09 and 0.98 to 1.21), but only because it is told which samples are cases.</li>
+</ul>
+<p>Methods that learn the batch effect from bridge samples only never see the condition, so a confounded design cannot pull the condition into their correction.</p>
+<p>CytoNorm maps every batch to the mean of all batches by default, while bridgenorm maps to the anchor batch; the effect ratio is read on each method’s own scale. With its goal set to the anchor batch, CytoNorm’s estimate under the calibrated batch effect moves from 1.065 to 1.019 times the true effect (bridgenorm 1.044), so most of CytoNorm’s excess came from its target. On the error of each study cell against its value without batch effect, CytoNorm with the anchor goal is closer than bridgenorm in 30 of 30 replicates under the calibrated batch effect (mean 0.049 against 0.071).</p>
+</section><section id="what-the-correction-looks-like" class="level2"><h2 class="anchored" data-anchor-id="what-the-correction-looks-like">What the correction looks like</h2>
+<p>The density of the effect marker in effect-population cells of the held-out bridge aliquot, simulation seed 1 and the first SOM seed, balanced design, for four of the fifteen batches. After a good correction, the batches overlap.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="compare_files/figure-html/densities-1.png" class="img-fluid figure-img" width="864"></p>
+</figure>
+</div>
+</div>
+</div>
+</section><section id="longitudinal-study-with-repeated-visits" class="level2"><h2 class="anchored" data-anchor-id="longitudinal-study-with-repeated-visits">Longitudinal study with repeated visits</h2>
+<p>Clinical studies often sample each subject at several visits, and the visits land in different batches. This section simulates that design to ask whether correction keeps a within-subject change over time. It uses the same simulator, calibration and batches as above, with a staggered design: each batch holds the first visit (t1) of a new cohort of four subjects, the second visit (t2) of the previous cohort and the third visit (t3) of the cohort before that. Thirteen cohorts give 52 subjects over the fifteen batches, so visit and batch overlap within every subject. In one population, one marker rises by 0.2 at t2 and 0.4 at t3; no other marker changes. Each subject keeps one population mix and marker offset across visits, plus small visit-to-visit noise. Both batch effects were simulated with ten seeds, each corrected with three SOM seeds (30 replicates); the script is <code>tools/sim-longitudinal.R</code>.</p>
+<p>CytoNorm runs three times here: with its default 15 by 15 grid, with the 8 by 8 grid shared by the other methods, and with its default grid and the anchor batch as goal. Six scores are reported, with no single primary one:</p>
+<ul>
+<li>
+<strong>Effect error at t2 and t3</strong>: the mean within-subject change of the effect marker in the effect population, divided by the true change; the score is the distance from 1.</li>
+<li>
+<strong>Drift on no-change markers</strong>: the median, over the other markers, of the absolute mean change from t1 to t3. The truth is 0.</li>
+<li>
+<strong>Noise SD on no-change markers</strong>: the median, over the other markers, of the standard deviation across subjects of the t1-to-t3 change. Batch effect left in the data adds to this noise.</li>
+<li>
+<strong>Paired t of the t3 effect</strong>: the mean change over its standard error, a measure of how easily a study would detect the effect.</li>
+<li>
+<strong>Held-out bridge EMD</strong>, as above.</li>
+</ul>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="compare_files/figure-html/longitudinal-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Points are the 30 replicates; bars are their mean. Drift and noise SD are on the no-change markers. Lower is better for every score except the paired t.</p>
+<p><strong>In this staggered design, the time effect survives every method, including no correction.</strong> Each subject’s visits sit in three consecutive batches, and different subjects meet different batches, so batch effects largely cancel in the mean change. Uncorrected data estimate the t3 effect at 1.061 times the truth under the calibrated batch effect.</p>
+<p><strong>What correction buys is precision.</strong> Under the calibrated batch effect, the batch effect left in uncorrected data inflates the subject-to-subject noise (0.204) and keeps the paired t at 13. bridgenorm cuts the noise to 0.063 and CytoNorm to 0.066, raising the paired t to 35 and 44. The paired shift gets part of the way (t = 19).</p>
+<p><strong>In this design, bridgenorm and CytoNorm keep time effects about equally well, and neither wins across scores.</strong> Counting a win only when a method is better in all 30 replicates, bridgenorm against the three CytoNorm settings has 0 wins, 0 losses and 36 ties over the 36 comparisons. bridgenorm has the lower noise under the calibrated batch effect. CytoNorm aligns the held-out bridge aliquot better under the calibrated batch effect (0.050 against 0.056), and its mean paired t is higher, though not in every replicate. The three CytoNorm settings score almost the same. With <code>shrink_k = 0</code>, bridgenorm’s paired t under the calibrated batch effect rises to 44 and its held-out EMD falls to 0.052, but its noise rises to 0.066. Against the 1.0.0 defaults, the 1.1.0 defaults win only on held-out EMD under the calibrated batch effect and tie on every time-effect score; their mean paired t there is 35 against 37.</p>
+<section id="harder-designs-drift-and-visits-confounded-with-batch" class="level3"><h3 class="anchored" data-anchor-id="harder-designs-drift-and-visits-confounded-with-batch">Harder designs: drift and visits confounded with batch</h3>
+<p>The staggered design is kind: every subject meets different batches at each visit, so batch effects cancel in the mean change. Four harder designs test what can go wrong, all under the calibrated batch effect:</p>
+<ul>
+<li>
+<strong>Instrument drift</strong>: every sample, bridge and study alike, reads two markers (the effect marker M05 and a no-change marker M10) higher by 0.05 per batch, on top of the batch effect.</li>
+<li>
+<strong>Visit confounded with batch</strong>: all first visits run in batches 1 to 5, second visits in 6 to 10 and third visits in 11 to 15.</li>
+<li>
+<strong>Bridge drift</strong>: the bridge material itself changes, by 0.02 per batch on M05 and M10; the study samples do not.</li>
+<li>
+<strong>Confounded + bridge drift</strong>: both.</li>
+</ul>
+<p>The time effect is now estimated with a mixed model of the per-sample medians, with a random intercept per subject, and again with a random intercept per batch added, as a downstream analysis might.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="compare_files/figure-html/designs-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Points are the 30 replicates; bars are their mean; dashed lines mark the truth.</p>
+<p><strong>Drift of the instrument is removed; drift of the bridge material is not.</strong> Under instrument drift, uncorrected data overstate the M05 effect (1.31 times the truth), and every correction brings it back (bridgenorm 1.01, CytoNorm 1.05). When the bridge material drifts instead, every bridge-based correction reads the drift as batch effect and subtracts it from the study samples. The effect shrinks (bridgenorm 0.90, CytoNorm 0.94), and the no-change marker M10 gains a false change (bridgenorm -0.043, against -0.005 uncorrected).</p>
+<p><strong>Confounding visit with batch makes bridge drift much worse.</strong> With visits in separate blocks of batches, the M05 effect falls to 0.50 of the truth for bridgenorm and 0.52 for CytoNorm, and M10 shows a false change of -0.207. Without bridge drift the same blocked design is safe after correction (bridgenorm 1.00).</p>
+<p><strong>A batch term in the downstream model does not repair it.</strong> With visit and batch confounded, a batch term cannot separate drift from time; in the staggered designs it recovers only a little. The protection is in the design: keep one bridge lot, check it for drift, and spread each subject’s visits over batches.</p>
+</section></section><section id="variance-left-to-batch" class="level2"><h2 class="anchored" data-anchor-id="variance-left-to-batch">Variance left to batch</h2>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 7%">
+<col style="width: 9%">
+<col style="width: 7%">
+<col style="width: 10%">
+<col style="width: 6%">
+<col style="width: 5%">
+<col style="width: 10%">
+<col style="width: 6%">
+<col style="width: 10%">
+</colgroup>
+<thead><tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">uncorrected</th>
+<th style="text-align: right;">no batch effect</th>
+<th style="text-align: right;">paired shift</th>
+<th style="text-align: right;">bridgenorm 1.0.0</th>
+<th style="text-align: right;">bridgenorm</th>
+<th style="text-align: right;">CytoNorm</th>
+<th style="text-align: right;">CytoNorm (anchor)</th>
+<th style="text-align: right;">cyCombine</th>
+<th style="text-align: right;">cyCombine + cov.</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Global shift, balanced</td>
+<td style="text-align: right;">47.0</td>
+<td style="text-align: right;">7.7</td>
+<td style="text-align: right;">8.4</td>
+<td style="text-align: right;">8.9</td>
+<td style="text-align: right;">9.1</td>
+<td style="text-align: right;">8.7</td>
+<td style="text-align: right;">8.7</td>
+<td style="text-align: right;">0.9</td>
+<td style="text-align: right;">0.9</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Global shift, confounded</td>
+<td style="text-align: right;">46.1</td>
+<td style="text-align: right;">7.7</td>
+<td style="text-align: right;">8.3</td>
+<td style="text-align: right;">8.8</td>
+<td style="text-align: right;">9.1</td>
+<td style="text-align: right;">8.7</td>
+<td style="text-align: right;">8.7</td>
+<td style="text-align: right;">1.1</td>
+<td style="text-align: right;">0.9</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Calibrated, balanced</td>
+<td style="text-align: right;">64.3</td>
+<td style="text-align: right;">7.8</td>
+<td style="text-align: right;">44.8</td>
+<td style="text-align: right;">13.5</td>
+<td style="text-align: right;">15.3</td>
+<td style="text-align: right;">13.7</td>
+<td style="text-align: right;">13.7</td>
+<td style="text-align: right;">6.4</td>
+<td style="text-align: right;">6.1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Calibrated, confounded</td>
+<td style="text-align: right;">63.3</td>
+<td style="text-align: right;">7.9</td>
+<td style="text-align: right;">44.1</td>
+<td style="text-align: right;">13.4</td>
+<td style="text-align: right;">15.1</td>
+<td style="text-align: right;">13.5</td>
+<td style="text-align: right;">13.6</td>
+<td style="text-align: right;">6.7</td>
+<td style="text-align: right;">6.2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Longitudinal, staggered</td>
+<td style="text-align: right;">44.7</td>
+<td style="text-align: right;">0.9</td>
+<td style="text-align: right;">29.2</td>
+<td style="text-align: right;">5.5</td>
+<td style="text-align: right;">6.6</td>
+<td style="text-align: right;">5.5</td>
+<td style="text-align: right;">5.4</td>
+<td style="text-align: right;">6.0</td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Longitudinal, visit = batch</td>
+<td style="text-align: right;">34.7</td>
+<td style="text-align: right;">0.6</td>
+<td style="text-align: right;">23.0</td>
+<td style="text-align: right;">4.1</td>
+<td style="text-align: right;">5.0</td>
+<td style="text-align: right;">4.1</td>
+<td style="text-align: right;">4.1</td>
+<td style="text-align: right;">3.1</td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Longitudinal, visit = batch + bridge drift</td>
+<td style="text-align: right;">34.7</td>
+<td style="text-align: right;">0.6</td>
+<td style="text-align: right;">22.6</td>
+<td style="text-align: right;">4.1</td>
+<td style="text-align: right;">5.0</td>
+<td style="text-align: right;">4.2</td>
+<td style="text-align: right;">4.2</td>
+<td style="text-align: right;">3.2</td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>A second check uses the BatchVaria package, which splits the variance of per-sample features into the share explained by batch, by the condition (or by visit and subject in the longitudinal designs), and the rest. The table gives the percent of variance explained by batch, for the median of each marker in each simulated population of the study samples, as the mean over three simulation seeds; lower is better. The no-batch-effect column is the floor: samples differ by chance, so batch explains a little even without a batch effect. The script is <code>tools/eval-batchvaria.R</code>; it also scores the medians in each node of a shared 5 by 5 SOM, with the same order of methods.</p>
+<p>bridgenorm with the 1.0.0 defaults and CytoNorm leave about the same share. The 1.1.0 defaults leave slightly more in every scenario (15.3 against 13.5 percent under the calibrated batch effect), in line with their higher error against the truth. cyCombine falls below the floor (0.9 against 7.7 percent under the global shift): it is fitted on the study samples, so it likely removes chance differences between batches along with the batch effect.</p>
+</section><section id="limits-of-this-comparison" class="level2"><h2 class="anchored" data-anchor-id="limits-of-this-comparison">Limits of this comparison</h2>
+<ul>
+<li>The simulation was written by the bridgenorm author and follows bridgenorm’s design: one reference donor in every batch, and an anchor batch without batch effect. Its batch effects are shifts and linear stretches within populations.</li>
+<li>The held-out bridge score suits methods that learn from bridge samples. cyCombine is scored on cells it was fitted on, and it targets the mean of all batches rather than the bridge donor.</li>
+<li>In the cross-sectional comparison each method ran with one setting per tool on a shared 8 by 8 grid, which is not the CytoNorm default of 15 by 15; the longitudinal section also runs CytoNorm at 15 by 15.</li>
+<li>CytoNorm maps every batch to the mean of all batches and cyCombine to the mean of all cells, while bridgenorm maps to the anchor batch. The effect ratio is read on each method’s own target scale.</li>
+<li>Ten simulation seeds crossed with three SOM seeds per cross-sectional scenario, and five per longitudinal one, give ranges, not confidence intervals.</li>
+<li>cyCombine’s bridge options (<code>ref.batch</code> with <code>anchor</code>) were tried and dropped: its per-cluster ComBat stops when a cluster has no cell of the reference batch, which happened in most runs.</li>
+<li>The longitudinal simulation has four subjects per cohort, one changing marker in one population, and visits in consecutive batches. Studies with visits far apart in time, or with bridge material that ages, may behave differently.</li>
+<li>cyCombine and the bridge-based methods answer different questions. cyCombine removes differences between batches of all cells; bridgenorm and CytoNorm remove only what the bridge samples show. Which is right depends on whether biology can differ between batches.</li>
+</ul>
+
+
+</section></main><!-- /main --><script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mdmanurung\.github\.io\/bridgenorm\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+</body></html>

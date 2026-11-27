@@ -1,0 +1,662 @@
+[
+  {
+    "objectID": "man/bn_bridges.html",
+    "href": "man/bn_bridges.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "A batch is bridged when at least one of its reference samples has a reference_id that is also measured in the anchor batch. Connection through other batches does not count. This is the rule bn_fit uses for unbridged.\n\nbn_bridges(samples, anchor)\n\n\n\n\n\nsamples\n\n\nData frame with columns sample_id, batch and reference_id (NA for samples that are not references).\n\n\n\n\nanchor\n\n\nThe anchor batch. Required.\n\n\n\nA tibble with one row per non-anchor batch: batch, n_shared_with_anchor, shared_ids (comma-separated) and bridged.\n\n\nlibrary(\"bridgenorm\")\n\nsamples &lt;- data.frame(\n  sample_id = paste0(\"s\", 1:4), batch = c(\"b1\", \"b2\", \"b3\", \"b3\"),\n  reference_id = c(\"R1\", \"R1\", \"R2\", NA)\n)\nbn_bridges(samples, anchor = \"b1\")\n\n# A tibble: 2 × 4\n  batch n_shared_with_anchor shared_ids bridged\n  &lt;chr&gt;                &lt;int&gt; &lt;chr&gt;      &lt;lgl&gt;  \n1 b2                       1 \"R1\"       TRUE   \n2 b3                       0 \"\"         FALSE",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_bridges"
+    ]
+  },
+  {
+    "objectID": "man/bn_bridges.html#which-batches-share-a-reference-with-the-anchor-batch",
+    "href": "man/bn_bridges.html#which-batches-share-a-reference-with-the-anchor-batch",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "A batch is bridged when at least one of its reference samples has a reference_id that is also measured in the anchor batch. Connection through other batches does not count. This is the rule bn_fit uses for unbridged.\n\nbn_bridges(samples, anchor)\n\n\n\n\n\nsamples\n\n\nData frame with columns sample_id, batch and reference_id (NA for samples that are not references).\n\n\n\n\nanchor\n\n\nThe anchor batch. Required.\n\n\n\nA tibble with one row per non-anchor batch: batch, n_shared_with_anchor, shared_ids (comma-separated) and bridged.\n\n\nlibrary(\"bridgenorm\")\n\nsamples &lt;- data.frame(\n  sample_id = paste0(\"s\", 1:4), batch = c(\"b1\", \"b2\", \"b3\", \"b3\"),\n  reference_id = c(\"R1\", \"R1\", \"R2\", NA)\n)\nbn_bridges(samples, anchor = \"b1\")\n\n# A tibble: 2 × 4\n  batch n_shared_with_anchor shared_ids bridged\n  &lt;chr&gt;                &lt;int&gt; &lt;chr&gt;      &lt;lgl&gt;  \n1 b2                       1 \"R1\"       TRUE   \n2 b3                       0 \"\"         FALSE",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_bridges"
+    ]
+  },
+  {
+    "objectID": "man/bn_reference_noise.html",
+    "href": "man/bn_reference_noise.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "For each batch, population and marker, summarises how noisy and how unusual the reference samples are, so the user can choose the anchor batch. It never chooses the anchor itself.\n\nbn_reference_noise(\n  x,\n  samples,\n  population,\n  markers,\n  transform = NULL,\n  min_cells = 50,\n  sample_ids = NULL\n)\n\n\n\n\n\nx\n\n\nA numeric matrix (cells by markers) or a data frame with one row per cell, already transformed. A data frame needs a sample_id column unless sample_ids is given.\n\n\n\n\nsamples\n\n\nData frame, one row per sample: sample_id, batch, reference_id (the bridge donor; NA for study samples) and optionally aliquot.\n\n\n\n\npopulation\n\n\nPer-cell population labels, one per row of x, frozen before correction.\n\n\n\n\nmarkers\n\n\nMarker columns to correct.\n\n\n\n\ntransform\n\n\nOptional list(name = “asinh”, cofactor = &lt;number&gt;): the scale x is on. It does not change the report; when given, it is checked and stored as the transform attribute of the result.\n\n\n\n\nmin_cells\n\n\nMinimum cells per reference aliquot summary and per (batch, node) quantile table.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\nColumns:\n\n\nn_references, n_aliquots\n\n\nReference donors and aliquots with at least min_cells cells.\n\n\nreplicate_sd\n\n\nPooled within-donor SD of aliquot means: \\(\\sqrt{\\sum (m_a - \\bar m_r)^2 / (n_{aliquots} - n_{references})}\\). NA when no donor has two aliquots in the batch.\n\n\ncell_sd\n\n\nMean over aliquots of the SD of their cells.\n\n\nloo_z\n\n\nLeave-one-batch-out z of the batch’s donor mean, averaged over donors: (donor mean in the batch - its mean over the other batches) / its SD over the other batches. A donor needs two other batches; NA when none has.\n\n\nA donor mean is the equal-weight mean of its aliquot means, as in bn_fit_paired.\n\nA tibble with one row per batch, population and marker.\n\nbn_fit, bn_bridges\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nbn_reference_noise(x, samples, rep(\"T\", nrow(x)), markers = \"M\")\n\n# A tibble: 2 × 8\n  batch population marker n_references n_aliquots replicate_sd cell_sd loo_z\n  &lt;chr&gt; &lt;chr&gt;      &lt;chr&gt;         &lt;int&gt;      &lt;int&gt;        &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt;\n1 b1    T          M                 1          2       0.0218   0.596    NA\n2 b2    T          M                 1          2       0.0374   0.581    NA",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_reference_noise"
+    ]
+  },
+  {
+    "objectID": "man/bn_reference_noise.html#report-the-reference-noise-of-each-batch",
+    "href": "man/bn_reference_noise.html#report-the-reference-noise-of-each-batch",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "For each batch, population and marker, summarises how noisy and how unusual the reference samples are, so the user can choose the anchor batch. It never chooses the anchor itself.\n\nbn_reference_noise(\n  x,\n  samples,\n  population,\n  markers,\n  transform = NULL,\n  min_cells = 50,\n  sample_ids = NULL\n)\n\n\n\n\n\nx\n\n\nA numeric matrix (cells by markers) or a data frame with one row per cell, already transformed. A data frame needs a sample_id column unless sample_ids is given.\n\n\n\n\nsamples\n\n\nData frame, one row per sample: sample_id, batch, reference_id (the bridge donor; NA for study samples) and optionally aliquot.\n\n\n\n\npopulation\n\n\nPer-cell population labels, one per row of x, frozen before correction.\n\n\n\n\nmarkers\n\n\nMarker columns to correct.\n\n\n\n\ntransform\n\n\nOptional list(name = “asinh”, cofactor = &lt;number&gt;): the scale x is on. It does not change the report; when given, it is checked and stored as the transform attribute of the result.\n\n\n\n\nmin_cells\n\n\nMinimum cells per reference aliquot summary and per (batch, node) quantile table.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\nColumns:\n\n\nn_references, n_aliquots\n\n\nReference donors and aliquots with at least min_cells cells.\n\n\nreplicate_sd\n\n\nPooled within-donor SD of aliquot means: \\(\\sqrt{\\sum (m_a - \\bar m_r)^2 / (n_{aliquots} - n_{references})}\\). NA when no donor has two aliquots in the batch.\n\n\ncell_sd\n\n\nMean over aliquots of the SD of their cells.\n\n\nloo_z\n\n\nLeave-one-batch-out z of the batch’s donor mean, averaged over donors: (donor mean in the batch - its mean over the other batches) / its SD over the other batches. A donor needs two other batches; NA when none has.\n\n\nA donor mean is the equal-weight mean of its aliquot means, as in bn_fit_paired.\n\nA tibble with one row per batch, population and marker.\n\nbn_fit, bn_bridges\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nbn_reference_noise(x, samples, rep(\"T\", nrow(x)), markers = \"M\")\n\n# A tibble: 2 × 8\n  batch population marker n_references n_aliquots replicate_sd cell_sd loo_z\n  &lt;chr&gt; &lt;chr&gt;      &lt;chr&gt;         &lt;int&gt;      &lt;int&gt;        &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt;\n1 b1    T          M                 1          2       0.0218   0.596    NA\n2 b2    T          M                 1          2       0.0374   0.581    NA",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_reference_noise"
+    ]
+  },
+  {
+    "objectID": "man/bn_fit.html",
+    "href": "man/bn_fit.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "Batch effects can change the shape of a marker’s distribution within a cell state, not only its location. bn_fit() runs a node shift (.bn_fit_nodes()), then refits a second map on the shifted cells and, in each second-pass node, maps every batch’s marker quantiles onto the anchor’s.\n\nbn_fit(\n  x,\n  samples,\n  population,\n  markers,\n  transform,\n  anchor,\n  grid,\n  mapping_markers,\n  seed,\n  min_cells = 50,\n  unbridged = \"abstain\",\n  train_cells = 500,\n  rlen = 100,\n  fallback = \"global\",\n  quantile_probs = seq(0.025, 0.975, length.out = 21),\n  shrink_k = 1000,\n  target = \"anchor\",\n  goal_batches = NULL,\n  sample_ids = NULL,\n  shrink_target = \"value\",\n  shrink_reweight = FALSE,\n  quantile_maps = TRUE\n)\n\n\n\n\n\nx\n\n\nA numeric matrix (cells by markers) or a data frame with one row per cell, already transformed. A data frame needs a sample_id column unless sample_ids is given.\n\n\n\n\nsamples\n\n\nData frame, one row per sample: sample_id, batch, reference_id (the bridge donor; NA for study samples) and optionally aliquot.\n\n\n\n\npopulation\n\n\nPer-cell population labels, one per row of x, frozen before correction.\n\n\n\n\nmarkers\n\n\nMarker columns to correct.\n\n\n\n\ntransform\n\n\nlist(name = “asinh”, cofactor = &lt;number&gt;): the scale x is on. It is recorded, never applied.\n\n\n\n\nanchor\n\n\nThe batch that defines the target scale.\n\n\n\n\ngrid\n\n\nSOM grid as c(xdim, ydim).\n\n\n\n\nmapping_markers\n\n\nMarkers that define cell state for the map; each must be one of markers.\n\n\n\n\nseed\n\n\nSeed for the training-cell draw and the SOM.\n\n\n\n\nmin_cells\n\n\nMinimum cells per reference aliquot summary and per (batch, node) quantile table.\n\n\n\n\nunbridged\n\n\n“abstain” leaves a batch that shares no bridge donor with the anchor raw and flags it; “stop” refuses the fit.\n\n\n\n\ntrain_cells\n\n\nMaximum training cells per reference sample for the SOM.\n\n\n\n\nrlen\n\n\nNumber of SOM training passes (kohonen::som).\n\n\n\n\nfallback\n\n\nFor a (batch, node, marker) without a node effect: “global” takes the batch’s global shift, “abstain” keeps the raw value.\n\n\n\n\nquantile_probs\n\n\nIncreasing probabilities in (0, 1), at least two, at which batch and anchor quantiles are matched.\n\n\n\n\nshrink_k\n\n\nNon-negative pseudo-count of cells for the shrinkage toward the batch-wide offset curve. Larger values borrow more; 0 turns shrinkage off. “eb” estimates one pseudo-count per marker by empirical Bayes from how much node offsets vary beyond their sampling noise, never below 300; the values are stored in settings$shrink_k_marker. It is kept for study; in benchmarks it did not beat the scalar default.\n\n\n\n\ntarget\n\n\n“anchor” corrects every batch to the anchor batch. “virtual” corrects every batch, the anchor included, to a virtual reference: per reference summary and per SOM node, the equal-weight mean over batches (for quantiles, the mean of the batches’ quantile curves). It covers the same summaries and nodes as the anchor, which still sets the bridges and the map. Not combined with shrink_k = “eb”.\n\n\n\n\ngoal_batches\n\n\nNULL, or with target = “virtual” two or more batches whose equal-weight mean is the goal (for example the batches of one study), as CytoNorm’s goal distribution. Goal batches that are unbridged or whose reference donors differ from the anchor’s are dropped. The anchor still sets the bridges and the map and may lie outside the goal; the fit stops when the goal lacks a reference summary the anchor has. Nodes without a goal quantile table take the pass-2 node shift.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\n\nshrink_target\n\n\nWhat each node’s offset curve is shrunk toward. “value” (default since 1.1.0) evaluates the batch-wide map (the batch’s quantile function composed with the target’s distribution function) at the node’s own target quantiles, so an intensity-dependent effect that is the same in every node is not shrunk toward a wrong curve. Beyond the outer batch-wide quantiles the map moves by their difference. “quantile” (the 1.0.0 behaviour) adds the batch-wide offset at the same probability, which equals the node’s offset only under a pure location shift. The value is stored in settings$shrink_target.\n\n\n\n\nshrink_reweight\n\n\nFALSE (default), or TRUE to compute the batch-wide curve with cell weights that give the batch the target’s share of reference cells in every second-pass node (the anchor’s, or with target = “virtual” the mean over the goal batches). It matters when a batch’s bridge samples have a different cell-state mix than the target’s.\n\n\n\n\nquantile_maps\n\n\nTRUE (default), or FALSE to keep no quantile tables, so every cell takes the pass-2 node shift (an ablation).\n\n\n\nSteps, all on reference cells only:\n\n\nPass 1: .bn_fit_nodes() with the given settings; its correction is applied to the reference cells.\n\n\nPass 2: .bn_fit_nodes() again, with the same settings, on the pass-1 cells. Its node shifts cover the cells pass 2 cannot map by quantiles.\n\n\nFor each (batch, pass-2 node) with at least min_cells reference cells pooled over its reference samples, in a batch whose reference donors (reference_id) are exactly the anchor’s, the quantiles at quantile_probs of every marker (stats::quantile(), type 7) are stored.\n\n\nShrinkage: in each such (batch, node) of a non-anchor batch whose node also has anchor quantiles, the node’s batch quantiles are pulled toward what the batch-wide map (built from all the batch’s pass-1 reference cells and the anchor’s) predicts for the node, with weight \\(n / (n + shrink_k)\\) on the node’s own quantiles, \\(n\\) being the batch’s reference cells in the node. With shrink_target = “value” (default) the batch-wide map is read at the node’s anchor quantiles; with “quantile” the batch-wide offset at the same probability is added to them. Each column of a shrunk table is then sorted (rearrangement; Chernozhukov, Fernandez-Val and Galichon 2010), because the mix can cross itself. shrink_k = 0 keeps the fitted tables.\n\n\nAt integrate time, pass 1 is applied, then each cell is assigned to its nearest pass-2 node. If its batch and the anchor both have quantiles in that node, each marker value is mapped by linear interpolation from the batch’s quantiles to the anchor’s; beyond the outer quantiles it moves by the difference of the outer quantiles (tail = “shift”). Other cells take the pass-2 node shift. Anchor cells are mapped onto their own quantiles, which leaves values between the outer quantiles unchanged.\nA batch with other reference donors than the anchor has no quantiles: pooled distributions of different donors differ by biology, not only by batch. Such a batch takes the pass-2 node shift if it is bridged, and is left raw if it is not.\nThe quantile rule pools wells, while the node shifts count cells per reference sample; a (batch, node) can therefore have quantiles without a node shift.\n\nA bn_node_quantile_model: a list with schema_version, settings, markers, transform, anchor, pass1 and pass2 (frozen node models), quantiles (one probabilities-by-markers matrix per batch and node; the list names are internal keys), software, created, parent_digest and digest.\n\nThe defaults come from benchmarking: min_cells = 50, train_cells = 500, rlen = 100, 21 quantiles from 0.025 to 0.975, shrink_k = 1000 with shrink_target = “value” (since 1.1.0; 1.0.0 used 300 and “quantile”). Check them on new data. grid, mapping_markers, anchor and seed have no default.\n\nbn_apply, bn_fit_paired\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nmodel &lt;- bn_fit(\n  x, samples, population = rep(\"T\", nrow(x)), markers = c(\"Lin\", \"M\"),\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  grid = c(2, 1), mapping_markers = \"Lin\", seed = 1, rlen = 20\n)\nmodel\n\n&lt;bn_node_quantile_model&gt; | anchor: b1 | nodes per pass: 2 | quantile tables: 4 | digest: e9594c9e5a3711d617740f0482294b01",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_fit"
+    ]
+  },
+  {
+    "objectID": "man/bn_fit.html#fit-a-two-pass-node-model-with-per-node-quantile-maps",
+    "href": "man/bn_fit.html#fit-a-two-pass-node-model-with-per-node-quantile-maps",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "Batch effects can change the shape of a marker’s distribution within a cell state, not only its location. bn_fit() runs a node shift (.bn_fit_nodes()), then refits a second map on the shifted cells and, in each second-pass node, maps every batch’s marker quantiles onto the anchor’s.\n\nbn_fit(\n  x,\n  samples,\n  population,\n  markers,\n  transform,\n  anchor,\n  grid,\n  mapping_markers,\n  seed,\n  min_cells = 50,\n  unbridged = \"abstain\",\n  train_cells = 500,\n  rlen = 100,\n  fallback = \"global\",\n  quantile_probs = seq(0.025, 0.975, length.out = 21),\n  shrink_k = 1000,\n  target = \"anchor\",\n  goal_batches = NULL,\n  sample_ids = NULL,\n  shrink_target = \"value\",\n  shrink_reweight = FALSE,\n  quantile_maps = TRUE\n)\n\n\n\n\n\nx\n\n\nA numeric matrix (cells by markers) or a data frame with one row per cell, already transformed. A data frame needs a sample_id column unless sample_ids is given.\n\n\n\n\nsamples\n\n\nData frame, one row per sample: sample_id, batch, reference_id (the bridge donor; NA for study samples) and optionally aliquot.\n\n\n\n\npopulation\n\n\nPer-cell population labels, one per row of x, frozen before correction.\n\n\n\n\nmarkers\n\n\nMarker columns to correct.\n\n\n\n\ntransform\n\n\nlist(name = “asinh”, cofactor = &lt;number&gt;): the scale x is on. It is recorded, never applied.\n\n\n\n\nanchor\n\n\nThe batch that defines the target scale.\n\n\n\n\ngrid\n\n\nSOM grid as c(xdim, ydim).\n\n\n\n\nmapping_markers\n\n\nMarkers that define cell state for the map; each must be one of markers.\n\n\n\n\nseed\n\n\nSeed for the training-cell draw and the SOM.\n\n\n\n\nmin_cells\n\n\nMinimum cells per reference aliquot summary and per (batch, node) quantile table.\n\n\n\n\nunbridged\n\n\n“abstain” leaves a batch that shares no bridge donor with the anchor raw and flags it; “stop” refuses the fit.\n\n\n\n\ntrain_cells\n\n\nMaximum training cells per reference sample for the SOM.\n\n\n\n\nrlen\n\n\nNumber of SOM training passes (kohonen::som).\n\n\n\n\nfallback\n\n\nFor a (batch, node, marker) without a node effect: “global” takes the batch’s global shift, “abstain” keeps the raw value.\n\n\n\n\nquantile_probs\n\n\nIncreasing probabilities in (0, 1), at least two, at which batch and anchor quantiles are matched.\n\n\n\n\nshrink_k\n\n\nNon-negative pseudo-count of cells for the shrinkage toward the batch-wide offset curve. Larger values borrow more; 0 turns shrinkage off. “eb” estimates one pseudo-count per marker by empirical Bayes from how much node offsets vary beyond their sampling noise, never below 300; the values are stored in settings$shrink_k_marker. It is kept for study; in benchmarks it did not beat the scalar default.\n\n\n\n\ntarget\n\n\n“anchor” corrects every batch to the anchor batch. “virtual” corrects every batch, the anchor included, to a virtual reference: per reference summary and per SOM node, the equal-weight mean over batches (for quantiles, the mean of the batches’ quantile curves). It covers the same summaries and nodes as the anchor, which still sets the bridges and the map. Not combined with shrink_k = “eb”.\n\n\n\n\ngoal_batches\n\n\nNULL, or with target = “virtual” two or more batches whose equal-weight mean is the goal (for example the batches of one study), as CytoNorm’s goal distribution. Goal batches that are unbridged or whose reference donors differ from the anchor’s are dropped. The anchor still sets the bridges and the map and may lie outside the goal; the fit stops when the goal lacks a reference summary the anchor has. Nodes without a goal quantile table take the pass-2 node shift.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\n\nshrink_target\n\n\nWhat each node’s offset curve is shrunk toward. “value” (default since 1.1.0) evaluates the batch-wide map (the batch’s quantile function composed with the target’s distribution function) at the node’s own target quantiles, so an intensity-dependent effect that is the same in every node is not shrunk toward a wrong curve. Beyond the outer batch-wide quantiles the map moves by their difference. “quantile” (the 1.0.0 behaviour) adds the batch-wide offset at the same probability, which equals the node’s offset only under a pure location shift. The value is stored in settings$shrink_target.\n\n\n\n\nshrink_reweight\n\n\nFALSE (default), or TRUE to compute the batch-wide curve with cell weights that give the batch the target’s share of reference cells in every second-pass node (the anchor’s, or with target = “virtual” the mean over the goal batches). It matters when a batch’s bridge samples have a different cell-state mix than the target’s.\n\n\n\n\nquantile_maps\n\n\nTRUE (default), or FALSE to keep no quantile tables, so every cell takes the pass-2 node shift (an ablation).\n\n\n\nSteps, all on reference cells only:\n\n\nPass 1: .bn_fit_nodes() with the given settings; its correction is applied to the reference cells.\n\n\nPass 2: .bn_fit_nodes() again, with the same settings, on the pass-1 cells. Its node shifts cover the cells pass 2 cannot map by quantiles.\n\n\nFor each (batch, pass-2 node) with at least min_cells reference cells pooled over its reference samples, in a batch whose reference donors (reference_id) are exactly the anchor’s, the quantiles at quantile_probs of every marker (stats::quantile(), type 7) are stored.\n\n\nShrinkage: in each such (batch, node) of a non-anchor batch whose node also has anchor quantiles, the node’s batch quantiles are pulled toward what the batch-wide map (built from all the batch’s pass-1 reference cells and the anchor’s) predicts for the node, with weight \\(n / (n + shrink_k)\\) on the node’s own quantiles, \\(n\\) being the batch’s reference cells in the node. With shrink_target = “value” (default) the batch-wide map is read at the node’s anchor quantiles; with “quantile” the batch-wide offset at the same probability is added to them. Each column of a shrunk table is then sorted (rearrangement; Chernozhukov, Fernandez-Val and Galichon 2010), because the mix can cross itself. shrink_k = 0 keeps the fitted tables.\n\n\nAt integrate time, pass 1 is applied, then each cell is assigned to its nearest pass-2 node. If its batch and the anchor both have quantiles in that node, each marker value is mapped by linear interpolation from the batch’s quantiles to the anchor’s; beyond the outer quantiles it moves by the difference of the outer quantiles (tail = “shift”). Other cells take the pass-2 node shift. Anchor cells are mapped onto their own quantiles, which leaves values between the outer quantiles unchanged.\nA batch with other reference donors than the anchor has no quantiles: pooled distributions of different donors differ by biology, not only by batch. Such a batch takes the pass-2 node shift if it is bridged, and is left raw if it is not.\nThe quantile rule pools wells, while the node shifts count cells per reference sample; a (batch, node) can therefore have quantiles without a node shift.\n\nA bn_node_quantile_model: a list with schema_version, settings, markers, transform, anchor, pass1 and pass2 (frozen node models), quantiles (one probabilities-by-markers matrix per batch and node; the list names are internal keys), software, created, parent_digest and digest.\n\nThe defaults come from benchmarking: min_cells = 50, train_cells = 500, rlen = 100, 21 quantiles from 0.025 to 0.975, shrink_k = 1000 with shrink_target = “value” (since 1.1.0; 1.0.0 used 300 and “quantile”). Check them on new data. grid, mapping_markers, anchor and seed have no default.\n\nbn_apply, bn_fit_paired\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nmodel &lt;- bn_fit(\n  x, samples, population = rep(\"T\", nrow(x)), markers = c(\"Lin\", \"M\"),\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  grid = c(2, 1), mapping_markers = \"Lin\", seed = 1, rlen = 20\n)\nmodel\n\n&lt;bn_node_quantile_model&gt; | anchor: b1 | nodes per pass: 2 | quantile tables: 4 | digest: e9594c9e5a3711d617740f0482294b01",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_fit"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "Batch correction for cytometry from bridge samples: reference material from the same donor measured in every batch.\nSite and articles: https://mdmanurung.github.io/bridgenorm/\nThe differences between bridge samples measure the technical batch effect. bridgenorm estimates the batch effect from them alone: study samples never enter a fit, so a condition that is confounded with batch cannot shape the correction. Each batch is corrected toward one anchor batch, or toward the mean of a chosen set of batches. A fitted model is frozen with a digest, so it applies to new data without changing earlier corrections.\n\n\n\nbridgenorm workflow: bridge samples in every batch, a model fitted on bridge cells only, then applied to every cell\n\n\n\n\nbn_fit() is the main method. It works on reference cells only, in two passes:\n\nA global paired shift places the bridge cells, and a self-organising map (SOM) on the mapping markers splits them into nodes (cell states). Each batch gets a paired shift per node: the mean over shared bridge donors of the batch-minus-anchor donor means.\nThe global shift, map and node shifts are refitted on the pass-1 cells. In each (batch, node), the batch’s marker quantiles are mapped onto the anchor’s; cells without a map take the pass-2 node shift. This corrects changes in the shape of a distribution, not only its location. Every node’s map is shrunk toward the batch-wide map, keeping weight n / (n + shrink_k) on its own, so small nodes borrow most. Since 1.1.0 the batch-wide map is read at the node’s own values (shrink_target = \"value\", shrink_k = 1000), so a stretch shared by all nodes is kept.\n\n\n\n\nThe two passes inside bn_fit(): SOM nodes and paired shifts, a refitted map, per-node quantile maps, and shrinkage of small nodes\n\n\nOnly batches whose bridge donors equal the anchor’s get quantile maps; other bridged batches get node shifts only, and bn_fit() warns which. A batch that shares no bridge donor with the anchor is left raw, and bn_apply() says so.\nThese options are off by default.\n\ntarget = \"virtual\" corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches’ quantile curves. Its benefit over the anchor target was not consistent across benchmarks, so the default stays target = \"anchor\". It does not combine with shrink_k = \"eb\".\ngoal_batches, with target = \"virtual\", restricts that mean to a chosen set of batches, for example the batches of one study, like CytoNorm’s goal distribution. No benchmark benefit is claimed yet.\nshrink_k = \"eb\" estimates one pseudo-count per marker by empirical Bayes, never below 300. It is kept for study; in benchmarks it did not beat the scalar default.\nshrink_reweight = TRUE builds each batch-wide map with the target’s cell-state mix of bridge cells, for batches whose bridges differ in mix.\nquantile_maps = FALSE keeps node shifts only, as an ablation.\n\nbn_fit_paired() fits the baseline: one paired shift per population and marker, with no nodes and no quantile maps. Every other model must beat it.\nThe anchor, SOM grid, mapping markers, seed and transform depend on the data and have no default. The other settings have defaults chosen by benchmarking; check them on your own data.\nThe article Compare with CytoNorm and cyCombine on simulated data runs the three methods on simulated data with known truth.\n\n\n\nremotes::install_github(\"mdmanurung/bridgenorm\")\n\n\n\nsamples &lt;- data.frame(\n  sample_id = ..., batch = ...,\n  reference_id = ..., # bridge donor; NA for study samples\n  aliquot = ...       # optional\n)\nbn_bridges(samples, anchor = \"b1\")\n\nmodel &lt;- bn_fit(\n  x, samples, population = labels, markers = markers,\n  transform = list(name = \"asinh\", cofactor = 6000), anchor = \"b1\",\n  grid = c(6, 6), mapping_markers = mapping, seed = 1\n)\nres &lt;- bn_apply(model, x, samples, labels)\nbn_save(model, \"bn_model.rds\")\nThe grid and mapping markers above show the shape of a call; choose them for your panel. Worked examples, each on simulated data with known truth:\n\nUse case 1: Correct batches with bridge samples\nUse case 2: Normalize toward a goal distribution\nUse case 3: Correct later batches with a frozen model\n\n\n\n\n\nx must already be on the transformed scale (for example asinh with your cofactor). transform only records the scale; nothing is transformed for you, and bn_fit() warns when the values look untransformed.\npopulation sets the strata of the global pre-shift and of the fallback for cells whose node has no effect. One label for all cells is valid; coarse lineage gates made before correction also work.\nPick the anchor as the batch with the least noisy bridge samples; bn_reference_noise() reports the noise per batch.\nRead res$actions after bn_apply(): one row per batch, node (or population) and marker, with what was done and why. table(res$actions$batch, res$actions$reason_code) is a quick check.\nbn_apply() holds a few copies of the data in memory; plan for about 5 GB per million cells, or apply batch by batch.\n\n\n\n\n\nKeep the fitted model. Applying it to later batches does not change earlier corrections. Later batches get node shifts estimated against the frozen anchor, but no quantile maps, so refit on all batches for the final analysis.\nUse one bridge lot. If the bridge material drifts over time, the drift is read as batch effect and its opposite appears as a change over time in every study sample.\nSpread each subject’s visits over batches and mix visits within batches where the design allows. Keep a batch term in downstream models; correction lowers but does not remove between-batch noise.\n\n\n\n\n\nBenchmarked on spectral and conventional flow cytometry. Mass cytometry, with many zero values, is untested.\nBridge samples should come from one donor, or the same donors in the same cell shares in every batch; quantile maps pool the donors’ cells.\nWithin a node, a batch effect is assumed to be a monotone change of each marker’s distribution. Cells far from every node take the nearest node’s correction.\n\n\n\n\nbridgenorm was called heb (hierarchical empirical Bayes) up to version 0.7.2. Version 0.9.0 removed the mixed-model fits ported from SpectraWeaveR, because no benchmarked method used them; experiments that need them use heb 0.7.x.",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#methods",
+    "href": "index.html#methods",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "bn_fit() is the main method. It works on reference cells only, in two passes:\n\nA global paired shift places the bridge cells, and a self-organising map (SOM) on the mapping markers splits them into nodes (cell states). Each batch gets a paired shift per node: the mean over shared bridge donors of the batch-minus-anchor donor means.\nThe global shift, map and node shifts are refitted on the pass-1 cells. In each (batch, node), the batch’s marker quantiles are mapped onto the anchor’s; cells without a map take the pass-2 node shift. This corrects changes in the shape of a distribution, not only its location. Every node’s map is shrunk toward the batch-wide map, keeping weight n / (n + shrink_k) on its own, so small nodes borrow most. Since 1.1.0 the batch-wide map is read at the node’s own values (shrink_target = \"value\", shrink_k = 1000), so a stretch shared by all nodes is kept.\n\n\n\n\nThe two passes inside bn_fit(): SOM nodes and paired shifts, a refitted map, per-node quantile maps, and shrinkage of small nodes\n\n\nOnly batches whose bridge donors equal the anchor’s get quantile maps; other bridged batches get node shifts only, and bn_fit() warns which. A batch that shares no bridge donor with the anchor is left raw, and bn_apply() says so.\nThese options are off by default.\n\ntarget = \"virtual\" corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches’ quantile curves. Its benefit over the anchor target was not consistent across benchmarks, so the default stays target = \"anchor\". It does not combine with shrink_k = \"eb\".\ngoal_batches, with target = \"virtual\", restricts that mean to a chosen set of batches, for example the batches of one study, like CytoNorm’s goal distribution. No benchmark benefit is claimed yet.\nshrink_k = \"eb\" estimates one pseudo-count per marker by empirical Bayes, never below 300. It is kept for study; in benchmarks it did not beat the scalar default.\nshrink_reweight = TRUE builds each batch-wide map with the target’s cell-state mix of bridge cells, for batches whose bridges differ in mix.\nquantile_maps = FALSE keeps node shifts only, as an ablation.\n\nbn_fit_paired() fits the baseline: one paired shift per population and marker, with no nodes and no quantile maps. Every other model must beat it.\nThe anchor, SOM grid, mapping markers, seed and transform depend on the data and have no default. The other settings have defaults chosen by benchmarking; check them on your own data.\nThe article Compare with CytoNorm and cyCombine on simulated data runs the three methods on simulated data with known truth.",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#install",
+    "href": "index.html#install",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "remotes::install_github(\"mdmanurung/bridgenorm\")",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#use",
+    "href": "index.html#use",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "samples &lt;- data.frame(\n  sample_id = ..., batch = ...,\n  reference_id = ..., # bridge donor; NA for study samples\n  aliquot = ...       # optional\n)\nbn_bridges(samples, anchor = \"b1\")\n\nmodel &lt;- bn_fit(\n  x, samples, population = labels, markers = markers,\n  transform = list(name = \"asinh\", cofactor = 6000), anchor = \"b1\",\n  grid = c(6, 6), mapping_markers = mapping, seed = 1\n)\nres &lt;- bn_apply(model, x, samples, labels)\nbn_save(model, \"bn_model.rds\")\nThe grid and mapping markers above show the shape of a call; choose them for your panel. Worked examples, each on simulated data with known truth:\n\nUse case 1: Correct batches with bridge samples\nUse case 2: Normalize toward a goal distribution\nUse case 3: Correct later batches with a frozen model",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#before-you-fit",
+    "href": "index.html#before-you-fit",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "x must already be on the transformed scale (for example asinh with your cofactor). transform only records the scale; nothing is transformed for you, and bn_fit() warns when the values look untransformed.\npopulation sets the strata of the global pre-shift and of the fallback for cells whose node has no effect. One label for all cells is valid; coarse lineage gates made before correction also work.\nPick the anchor as the batch with the least noisy bridge samples; bn_reference_noise() reports the noise per batch.\nRead res$actions after bn_apply(): one row per batch, node (or population) and marker, with what was done and why. table(res$actions$batch, res$actions$reason_code) is a quick check.\nbn_apply() holds a few copies of the data in memory; plan for about 5 GB per million cells, or apply batch by batch.",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#longitudinal-studies",
+    "href": "index.html#longitudinal-studies",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "Keep the fitted model. Applying it to later batches does not change earlier corrections. Later batches get node shifts estimated against the frozen anchor, but no quantile maps, so refit on all batches for the final analysis.\nUse one bridge lot. If the bridge material drifts over time, the drift is read as batch effect and its opposite appears as a change over time in every study sample.\nSpread each subject’s visits over batches and mix visits within batches where the design allows. Keep a batch term in downstream models; correction lowers but does not remove between-batch noise.",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#limits",
+    "href": "index.html#limits",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "Benchmarked on spectral and conventional flow cytometry. Mass cytometry, with many zero values, is untested.\nBridge samples should come from one donor, or the same donors in the same cell shares in every batch; quantile maps pool the donors’ cells.\nWithin a node, a batch effect is assumed to be a monotone change of each marker’s distribution. Cells far from every node take the nearest node’s correction.",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#origin",
+    "href": "index.html#origin",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "bridgenorm was called heb (hierarchical empirical Bayes) up to version 0.7.2. Version 0.9.0 removed the mixed-model fits ported from SpectraWeaveR, because no benchmarked method used them; experiments that need them use heb 0.7.x.",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "LICENSE.html",
+    "href": "LICENSE.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "YEAR: 2026 COPYRIGHT HOLDER: bridgenorm authors",
+    "crumbs": [
+      "Home",
+      "License"
+    ]
+  },
+  {
+    "objectID": "vignettes/frozen-model.html",
+    "href": "vignettes/frozen-model.html",
+    "title": "Use case 3: Correct later batches with a frozen model",
+    "section": "",
+    "text": "Longitudinal clinical studies run for months or years. Samples are measured as subjects come in, and an interim analysis often starts before the last batch is measured. If every new batch changed the correction of earlier ones, every interim result would have to be redone. A bridgenorm model is frozen: bn_apply() corrects a new batch from its own bridge wells, against the anchor summaries stored in the model, and leaves the earlier batches exactly as they were.\nThe price is that a late batch gets node shifts only, not quantile maps: the maps need the batch’s bridge cells at fit time. For the final analysis, refit on all batches.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 3: Correct later batches with a frozen model"
+    ]
+  },
+  {
+    "objectID": "vignettes/frozen-model.html#prepare-the-bridgenorm-normalization-step",
+    "href": "vignettes/frozen-model.html#prepare-the-bridgenorm-normalization-step",
+    "title": "Use case 3: Correct later batches with a frozen model",
+    "section": "Prepare the bridgenorm normalization step",
+    "text": "Prepare the bridgenorm normalization step\n\nlibrary(bridgenorm)\n\nFive batches each hold two bridge wells of one reference donor and two study samples. Batches b1 to b3 are measured first; b4 and b5 arrive later. Each batch shifts and stretches marker M by its own amount in each cell state.\n\nset.seed(3)\nbatches &lt;- paste0(\"b\", 1:5)\ncentre &lt;- c(A = 2, B = 1)\nlin &lt;- c(A = 1, B = 4)\neffect &lt;- lapply(setNames(batches, batches), function(b) {\n  if (b == \"b1\") {\n    return(list(shift = c(A = 0, B = 0), scale = 1))\n  }\n  list(shift = c(A = rnorm(1, 0, 0.3), B = rnorm(1, 0, 0.3)), scale = exp(rnorm(1, 0, 0.2)))\n})\nsamples &lt;- data.frame(\n  sample_id = c(outer(c(\"ref1\", \"ref2\", \"s1\", \"s2\"), batches, paste, sep = \"_\")),\n  batch = rep(batches, each = 4),\n  reference_id = rep(c(\"donor\", \"donor\", NA, NA), 5),\n  aliquot = rep(c(\"ref1\", \"ref2\", NA, NA), 5)\n)\ncells &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  b &lt;- samples$batch[i]\n  do.call(rbind, lapply(c(\"A\", \"B\"), function(k) {\n    truth &lt;- rnorm(300, centre[[k]], 0.3)\n    data.frame(\n      sample_id = samples$sample_id[i],\n      Lin = rnorm(300, lin[[k]], 0.2),\n      M = centre[[k]] + effect[[b]]$scale * (truth - centre[[k]]) + effect[[b]]$shift[[k]],\n      truth = truth\n    )\n  }))\n}))\ncells$batch &lt;- samples$batch[match(cells$sample_id, samples$sample_id)]\nstudy &lt;- is.na(samples$reference_id[match(cells$sample_id, samples$sample_id)])\nearly &lt;- cells$batch %in% c(\"b1\", \"b2\", \"b3\")",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 3: Correct later batches with a frozen model"
+    ]
+  },
+  {
+    "objectID": "vignettes/frozen-model.html#train-the-bridgenorm-model-on-the-early-batches",
+    "href": "vignettes/frozen-model.html#train-the-bridgenorm-model-on-the-early-batches",
+    "title": "Use case 3: Correct later batches with a frozen model",
+    "section": "Train the bridgenorm model on the early batches",
+    "text": "Train the bridgenorm model on the early batches\n\nfit &lt;- function(rows) {\n  bn_fit(\n    x = cells[rows, c(\"sample_id\", \"Lin\", \"M\")],\n    samples = samples[samples$batch %in% cells$batch[rows], ],\n    population = rep(\"T\", sum(rows)),\n    markers = c(\"Lin\", \"M\"),\n    transform = list(name = \"asinh\", cofactor = 5),\n    anchor = \"b1\",\n    grid = c(2, 1),\n    mapping_markers = \"Lin\",\n    seed = 1,\n    train_cells = 300,\n    rlen = 50\n  )\n}\nmodel &lt;- fit(early)\npath &lt;- tempfile(fileext = \".rds\")\nbn_save(model, path)",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 3: Correct later batches with a frozen model"
+    ]
+  },
+  {
+    "objectID": "vignettes/frozen-model.html#apply-the-bridgenorm-model",
+    "href": "vignettes/frozen-model.html#apply-the-bridgenorm-model",
+    "title": "Use case 3: Correct later batches with a frozen model",
+    "section": "Apply the bridgenorm model",
+    "text": "Apply the bridgenorm model\nInterim analysis\n\ninterim &lt;- bn_apply(model, cells[early, c(\"sample_id\", \"Lin\", \"M\")], samples, rep(\"T\", sum(early)))\n\nLater batches arrive\nThe saved model is loaded and applied to all batches. The new batches b4 and b5 get effects estimated from their own bridge wells against the frozen anchor summaries.\n\nmodel &lt;- bn_load(path)\nlater &lt;- bn_apply(model, cells[, c(\"sample_id\", \"Lin\", \"M\")], samples, rep(\"T\", nrow(cells)))\nunique(later$actions[later$actions$batch %in% c(\"b4\", \"b5\"), c(\"batch\", \"pass\", \"reason_code\")])\n#&gt; # A tibble: 4 × 3\n#&gt;   batch  pass reason_code        \n#&gt;   &lt;chr&gt; &lt;int&gt; &lt;chr&gt;              \n#&gt; 1 b4        1 estimated_new_batch\n#&gt; 2 b5        1 estimated_new_batch\n#&gt; 3 b4        2 estimated_new_batch\n#&gt; 4 b5        2 estimated_new_batch\n\nThe earlier batches keep exactly the values of the interim analysis:\n\nidentical(later$x$M[early], interim$x$M)\n#&gt; [1] TRUE\n\nlater$model is the model extended with the effects of the new batches. It has a new digest and records the old one as its parent, so every correction can be traced to the model that made it.\n\nc(parent = later$model$parent_digest, digest = later$model$digest)\n#&gt;                             parent                             digest \n#&gt; \"0cc184d08d567feae1f44db817baa7af\" \"6d5147388747db106a9b90b14e523560\"",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 3: Correct later batches with a frozen model"
+    ]
+  },
+  {
+    "objectID": "vignettes/frozen-model.html#evaluate-the-quality",
+    "href": "vignettes/frozen-model.html#evaluate-the-quality",
+    "title": "Use case 3: Correct later batches with a frozen model",
+    "section": "Evaluate the quality",
+    "text": "Evaluate the quality\nThe error of the study cells against their values without the batch effect, per batch, for the frozen model and for a refit on all five batches. The frozen model corrects b4 and b5 with node shifts only, so it can leave more of a batch effect that changes the shape of a distribution than the refit, which builds quantile maps for them too.\n\nrefit &lt;- bn_apply(fit(rep(TRUE, nrow(cells))), cells[, c(\"sample_id\", \"Lin\", \"M\")], samples,\n  rep(\"T\", nrow(cells)))\nerror &lt;- function(v) tapply(abs(v[study] - cells$truth[study]), cells$batch[study], mean)\nround(rbind(\n  uncorrected = error(cells$M),\n  frozen = error(later$x$M),\n  refit = error(refit$x$M)\n), 3)\n#&gt;             b1    b2    b3    b4    b5\n#&gt; uncorrected  0 0.188 0.202 0.198 0.303\n#&gt; frozen       0 0.011 0.023 0.054 0.048\n#&gt; refit        0 0.011 0.023 0.023 0.025\n\n\ncolours &lt;- c(b1 = \"black\", b4 = \"#E69F00\", b5 = \"#0072B2\")\nop &lt;- par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))\npanels &lt;- list(uncorrected = cells$M, frozen = later$x$M, refit = refit$x$M)\nfor (panel in names(panels)) {\n  plot(NULL, xlim = c(-0.5, 3.5), ylim = c(0, 1.6), xlab = \"M\", ylab = \"Density\", main = panel)\n  for (b in names(colours)) lines(density(panels[[panel]][study & cells$batch == b]), col = colours[[b]])\n}\nlegend(\"topright\", legend = names(colours), col = colours, lwd = 1, bty = \"n\")\n\n\n\n\n\n\npar(op)",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 3: Correct later batches with a frozen model"
+    ]
+  },
+  {
+    "objectID": "vignettes/frozen-model.html#recommendations-for-longitudinal-studies",
+    "href": "vignettes/frozen-model.html#recommendations-for-longitudinal-studies",
+    "title": "Use case 3: Correct later batches with a frozen model",
+    "section": "Recommendations for longitudinal studies",
+    "text": "Recommendations for longitudinal studies\n\nKeep the fitted model and apply it to later batches for interim analyses; earlier corrections do not move.\nRefit on all batches for the final analysis, so late batches get quantile maps too.\nUse one bridge lot throughout. If the bridge material drifts over time, the drift is read as batch effect and its opposite appears as a change over time in every study sample.\nSpread each subject’s visits over batches, and keep a batch term in downstream models.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 3: Correct later batches with a frozen model"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html",
+    "href": "vignettes/compare.html",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "",
+    "text": "This article compares bridgenorm with two widely used batch-correction tools, CytoNorm and cyCombine, on simulated data where the truth is known. The study design and the size of the batch effects are set to realistic values for a multi-batch cytometry study with bridge samples. The methods were run once with the script tools/sim-compare.R in the package repository; the article reads its saved results, so building it does not need CytoNorm or cyCombine.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#simulated-data",
+    "href": "vignettes/compare.html#simulated-data",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "Simulated data",
+    "text": "Simulated data\nEach data set has 15 batches. The first batch is the anchor and carries no batch effect. Every batch holds 3 (2 fit, 1 held out) bridge aliquots of one reference donor and 12 study samples from different donors, with 5000 cells per sample. Cells come from 8 populations measured on 24 markers. Study donors differ in population mix and carry small marker offsets. Cases carry a known condition effect: +0.4 on M05 in population P3.\nTwo kinds of batch effect are simulated:\n\n\nGlobal shift: one shift per batch and marker, the same for every cell. Its size varies by marker; the median standard deviation over batches is 0.084.\n\nCalibrated: the global shift plus, per batch, population and marker, a further shift (median SD 0.1) and a stretch or compression of the distribution (median SD of the log scale factor 0.236). The batch effect then differs between cell states and changes the shape of the distributions. The three spreads were measured on bridge wells of an unpublished multi-batch study with bridgenorm at shrink_k = 0; the scale spread is an upper estimate, because it also holds sampling noise.\n\nAnd two study designs:\n\n\nBalanced: six cases and six controls in every batch.\n\nConfounded: from 1 to 11 cases per batch (1, 2, 2, 3, 4, 5, 5, 6, 7, 7, 8, 9, 10, 10, 11), so condition and batch overlap.\n\nThat makes four scenarios, each simulated with ten seeds; every simulated data set is corrected with three SOM seeds, so each method has 30 replicates per scenario. A last arm keeps the simulated values without batch effect: the floor that sampling noise sets for every score.\n\n\n\n\n\n\n\n\nSetting\nValue\n\n\n\nsimulation seeds\n1, 2, 3, 4, 5, 6, 7, 8, 9, 10\n\n\nSOM seeds\n473, 474, 475\n\n\nbatches\n15\n\n\nbridge aliquots per batch\n3 (2 fit, 1 held out)\n\n\nstudy samples per batch\n12\n\n\ncells per sample\n5000\n\n\nmarkers\n24\n\n\npopulations\n8\n\n\neffect\n+0.4 on M05 in population P3\n\n\ncases per batch (balanced)\n6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6\n\n\ncases per batch (confounded)\n1, 2, 2, 3, 4, 5, 5, 6, 7, 7, 8, 9, 10, 10, 11\n\n\nglobal shift SD per marker (median)\n0.084\n\n\nstate-specific shift SD per marker (median)\n0.1\n\n\nlog scale SD per marker (median)\n0.236\n\n\nSOM grid (all methods)\n8x8\n\n\nbridgenorm\nbridgenorm 1.1.0, defaults, all markers mapped\n\n\nCytoNorm\nCytoNorm 2.0.10, FlowSOM nCells = 1e+06, xdim = 8, ydim = 8, nClus = 10, scale = FALSE; defaults except the grid; CytoNorm_anchor sets normParams goal to b01\n\n\ncyCombine\ncyCombine 0.3.0, defaults (8x8); run twice: no covariate, and the true condition as covariate",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#methods-and-settings",
+    "href": "vignettes/compare.html#methods-and-settings",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "Methods and settings",
+    "text": "Methods and settings\nAll methods use the same 8 by 8 self-organising map grid; otherwise each runs with its package defaults. bridgenorm and CytoNorm are fitted on two of the three bridge aliquots of every batch; the third is held out for scoring. cyCombine has no separate apply step; it is fitted on and corrects all cells, study samples and the held-out aliquot included, as it is designed to. cyCombine runs twice: with its default of no covariate, and with the true condition (case or control) as covariate, which is what its documentation suggests when the condition is known. That second run uses labels that the bridge-based methods never see. The paired shift (bn_fit_paired(), one shift per batch and marker) is the baseline.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#how-the-methods-are-scored",
+    "href": "vignettes/compare.html#how-the-methods-are-scored",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "How the methods are scored",
+    "text": "How the methods are scored\n\n\nHeld-out bridge EMD measures how much batch effect is left. The held-out bridge aliquot is the same donor in every batch, so after a perfect correction its distributions match across batches. Per marker, the score takes the largest one-dimensional earth mover’s distance between any two of the 15 batches, then the median over markers. Lower is better. Sampling noise alone keeps the score above zero.\n\nCondition-effect recovery measures whether biology survives. Per study sample, the median of the effect marker in the effect population is taken; the effect is the mean of cases minus the mean of controls, with no batch term. The figures show the estimate divided by the true effect, so 1 means the effect is kept.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#batch-effect-left-after-correction",
+    "href": "vignettes/compare.html#batch-effect-left-after-correction",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "Batch effect left after correction",
+    "text": "Batch effect left after correction\n\n\n\n\n\n\n\n\nPoints are the 30 replicates; bars are their mean. The design changes only the study samples, so the bridge-based scores repeat across the two designs.\nGlobal shift. CytoNorm (0.048), bridgenorm (0.052) and the paired shift (0.054) bring the held-out EMD down from 0.298 to nearly the same level; cyCombine leaves slightly more (0.056). A global shift is what the paired shift is built for, so the node-level methods gain little here.\nCalibrated batch effect. The paired shift now falls behind (0.144), because one shift per batch and marker cannot follow effects that differ between cell states. CytoNorm leaves the least (0.049), then bridgenorm (0.058) and cyCombine (0.073 without, 0.069 with the covariate). CytoNorm and bridgenorm both learn per-cluster quantile maps from the bridge samples. bridgenorm also pulls each node’s map toward the batch-wide map: with about 150 bridge cells per node here and the default shrink_k = 1000, a node keeps about an eighth of its own map. That explains part of why it leaves more of the cell-state-specific effect than CytoNorm: with shrink_k = 0, the held-out EMD here falls to 0.052.\nThe defaults changed in bridgenorm 1.1.0, from shrinkage toward the batch-wide curve at the same quantile with shrink_k = 300 (“bridgenorm 1.0.0” in the figures) to shrinkage toward the batch-wide map at the same value with shrink_k = 1000. They were chosen by tuning on held-out bridge wells of two real studies, which are not public. In these simulations the change is a trade-off. Under the calibrated batch effect, the 1.1.0 defaults lower the held-out EMD (from 0.066 to 0.058, lower in 30 of 30 replicates), but raise the error of study cells against their values without batch effect (from 0.067 to 0.071, higher in 30 of 30). Under the global shift the two scores move the other way, and less. Counting a win only when a method is better in every replicate, CytoNorm beats bridgenorm on held-out EMD under the calibrated batch effect: it is lower in 30 of 30 replicates.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#biology-kept-after-correction",
+    "href": "vignettes/compare.html#biology-kept-after-correction",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "Biology kept after correction",
+    "text": "Biology kept after correction\n\n\n\n\n\n\n\n\nBalanced design. With the condition balanced within every batch, a batch effect does not bias the case-control difference much, and every method stays close to the truth.\nConfounded design. Here cases sit mostly in some batches, so any batch effect left in the data, or any biology removed as batch effect, biases the estimate.\n\nUnder the calibrated batch effect, the uncorrected estimate is 0.88 to 1.27 times the true effect. bridgenorm (0.96 to 1.12) and CytoNorm (0.97 to 1.14) bring it near 1; the paired shift less so (0.91 to 1.20).\ncyCombine without a covariate shrinks the effect (0.68 to 0.86 under the global shift, 0.78 to 1.07 under the calibrated one). It is fitted on the study samples, and when cases cluster in some batches, part of the case effect looks like batch effect and is removed.\nWith the true condition as covariate, cyCombine keeps the effect (0.89 to 1.09 and 0.98 to 1.21), but only because it is told which samples are cases.\n\nMethods that learn the batch effect from bridge samples only never see the condition, so a confounded design cannot pull the condition into their correction.\nCytoNorm maps every batch to the mean of all batches by default, while bridgenorm maps to the anchor batch; the effect ratio is read on each method’s own scale. With its goal set to the anchor batch, CytoNorm’s estimate under the calibrated batch effect moves from 1.065 to 1.019 times the true effect (bridgenorm 1.044), so most of CytoNorm’s excess came from its target. On the error of each study cell against its value without batch effect, CytoNorm with the anchor goal is closer than bridgenorm in 30 of 30 replicates under the calibrated batch effect (mean 0.049 against 0.071).",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#what-the-correction-looks-like",
+    "href": "vignettes/compare.html#what-the-correction-looks-like",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "What the correction looks like",
+    "text": "What the correction looks like\nThe density of the effect marker in effect-population cells of the held-out bridge aliquot, simulation seed 1 and the first SOM seed, balanced design, for four of the fifteen batches. After a good correction, the batches overlap.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#longitudinal-study-with-repeated-visits",
+    "href": "vignettes/compare.html#longitudinal-study-with-repeated-visits",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "Longitudinal study with repeated visits",
+    "text": "Longitudinal study with repeated visits\nClinical studies often sample each subject at several visits, and the visits land in different batches. This section simulates that design to ask whether correction keeps a within-subject change over time. It uses the same simulator, calibration and batches as above, with a staggered design: each batch holds the first visit (t1) of a new cohort of four subjects, the second visit (t2) of the previous cohort and the third visit (t3) of the cohort before that. Thirteen cohorts give 52 subjects over the fifteen batches, so visit and batch overlap within every subject. In one population, one marker rises by 0.2 at t2 and 0.4 at t3; no other marker changes. Each subject keeps one population mix and marker offset across visits, plus small visit-to-visit noise. Both batch effects were simulated with ten seeds, each corrected with three SOM seeds (30 replicates); the script is tools/sim-longitudinal.R.\nCytoNorm runs three times here: with its default 15 by 15 grid, with the 8 by 8 grid shared by the other methods, and with its default grid and the anchor batch as goal. Six scores are reported, with no single primary one:\n\n\nEffect error at t2 and t3: the mean within-subject change of the effect marker in the effect population, divided by the true change; the score is the distance from 1.\n\nDrift on no-change markers: the median, over the other markers, of the absolute mean change from t1 to t3. The truth is 0.\n\nNoise SD on no-change markers: the median, over the other markers, of the standard deviation across subjects of the t1-to-t3 change. Batch effect left in the data adds to this noise.\n\nPaired t of the t3 effect: the mean change over its standard error, a measure of how easily a study would detect the effect.\n\nHeld-out bridge EMD, as above.\n\n\n\n\n\n\n\n\n\nPoints are the 30 replicates; bars are their mean. Drift and noise SD are on the no-change markers. Lower is better for every score except the paired t.\nIn this staggered design, the time effect survives every method, including no correction. Each subject’s visits sit in three consecutive batches, and different subjects meet different batches, so batch effects largely cancel in the mean change. Uncorrected data estimate the t3 effect at 1.061 times the truth under the calibrated batch effect.\nWhat correction buys is precision. Under the calibrated batch effect, the batch effect left in uncorrected data inflates the subject-to-subject noise (0.204) and keeps the paired t at 13. bridgenorm cuts the noise to 0.063 and CytoNorm to 0.066, raising the paired t to 35 and 44. The paired shift gets part of the way (t = 19).\nIn this design, bridgenorm and CytoNorm keep time effects about equally well, and neither wins across scores. Counting a win only when a method is better in all 30 replicates, bridgenorm against the three CytoNorm settings has 0 wins, 0 losses and 36 ties over the 36 comparisons. bridgenorm has the lower noise under the calibrated batch effect. CytoNorm aligns the held-out bridge aliquot better under the calibrated batch effect (0.050 against 0.056), and its mean paired t is higher, though not in every replicate. The three CytoNorm settings score almost the same. With shrink_k = 0, bridgenorm’s paired t under the calibrated batch effect rises to 44 and its held-out EMD falls to 0.052, but its noise rises to 0.066. Against the 1.0.0 defaults, the 1.1.0 defaults win only on held-out EMD under the calibrated batch effect and tie on every time-effect score; their mean paired t there is 35 against 37.\nHarder designs: drift and visits confounded with batch\nThe staggered design is kind: every subject meets different batches at each visit, so batch effects cancel in the mean change. Four harder designs test what can go wrong, all under the calibrated batch effect:\n\n\nInstrument drift: every sample, bridge and study alike, reads two markers (the effect marker M05 and a no-change marker M10) higher by 0.05 per batch, on top of the batch effect.\n\nVisit confounded with batch: all first visits run in batches 1 to 5, second visits in 6 to 10 and third visits in 11 to 15.\n\nBridge drift: the bridge material itself changes, by 0.02 per batch on M05 and M10; the study samples do not.\n\nConfounded + bridge drift: both.\n\nThe time effect is now estimated with a mixed model of the per-sample medians, with a random intercept per subject, and again with a random intercept per batch added, as a downstream analysis might.\n\n\n\n\n\n\n\n\nPoints are the 30 replicates; bars are their mean; dashed lines mark the truth.\nDrift of the instrument is removed; drift of the bridge material is not. Under instrument drift, uncorrected data overstate the M05 effect (1.31 times the truth), and every correction brings it back (bridgenorm 1.01, CytoNorm 1.05). When the bridge material drifts instead, every bridge-based correction reads the drift as batch effect and subtracts it from the study samples. The effect shrinks (bridgenorm 0.90, CytoNorm 0.94), and the no-change marker M10 gains a false change (bridgenorm -0.043, against -0.005 uncorrected).\nConfounding visit with batch makes bridge drift much worse. With visits in separate blocks of batches, the M05 effect falls to 0.50 of the truth for bridgenorm and 0.52 for CytoNorm, and M10 shows a false change of -0.207. Without bridge drift the same blocked design is safe after correction (bridgenorm 1.00).\nA batch term in the downstream model does not repair it. With visit and batch confounded, a batch term cannot separate drift from time; in the staggered designs it recovers only a little. The protection is in the design: keep one bridge lot, check it for drift, and spread each subject’s visits over batches.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#variance-left-to-batch",
+    "href": "vignettes/compare.html#variance-left-to-batch",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "Variance left to batch",
+    "text": "Variance left to batch\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nuncorrected\nno batch effect\npaired shift\nbridgenorm 1.0.0\nbridgenorm\nCytoNorm\nCytoNorm (anchor)\ncyCombine\ncyCombine + cov.\n\n\n\nGlobal shift, balanced\n47.0\n7.7\n8.4\n8.9\n9.1\n8.7\n8.7\n0.9\n0.9\n\n\nGlobal shift, confounded\n46.1\n7.7\n8.3\n8.8\n9.1\n8.7\n8.7\n1.1\n0.9\n\n\nCalibrated, balanced\n64.3\n7.8\n44.8\n13.5\n15.3\n13.7\n13.7\n6.4\n6.1\n\n\nCalibrated, confounded\n63.3\n7.9\n44.1\n13.4\n15.1\n13.5\n13.6\n6.7\n6.2\n\n\nLongitudinal, staggered\n44.7\n0.9\n29.2\n5.5\n6.6\n5.5\n5.4\n6.0\n\n\n\nLongitudinal, visit = batch\n34.7\n0.6\n23.0\n4.1\n5.0\n4.1\n4.1\n3.1\n\n\n\nLongitudinal, visit = batch + bridge drift\n34.7\n0.6\n22.6\n4.1\n5.0\n4.2\n4.2\n3.2\n\n\n\n\n\n\nA second check uses the BatchVaria package, which splits the variance of per-sample features into the share explained by batch, by the condition (or by visit and subject in the longitudinal designs), and the rest. The table gives the percent of variance explained by batch, for the median of each marker in each simulated population of the study samples, as the mean over three simulation seeds; lower is better. The no-batch-effect column is the floor: samples differ by chance, so batch explains a little even without a batch effect. The script is tools/eval-batchvaria.R; it also scores the medians in each node of a shared 5 by 5 SOM, with the same order of methods.\nbridgenorm with the 1.0.0 defaults and CytoNorm leave about the same share. The 1.1.0 defaults leave slightly more in every scenario (15.3 against 13.5 percent under the calibrated batch effect), in line with their higher error against the truth. cyCombine falls below the floor (0.9 against 7.7 percent under the global shift): it is fitted on the study samples, so it likely removes chance differences between batches along with the batch effect.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/compare.html#limits-of-this-comparison",
+    "href": "vignettes/compare.html#limits-of-this-comparison",
+    "title": "Compare with CytoNorm and cyCombine on simulated data",
+    "section": "Limits of this comparison",
+    "text": "Limits of this comparison\n\nThe simulation was written by the bridgenorm author and follows bridgenorm’s design: one reference donor in every batch, and an anchor batch without batch effect. Its batch effects are shifts and linear stretches within populations.\nThe held-out bridge score suits methods that learn from bridge samples. cyCombine is scored on cells it was fitted on, and it targets the mean of all batches rather than the bridge donor.\nIn the cross-sectional comparison each method ran with one setting per tool on a shared 8 by 8 grid, which is not the CytoNorm default of 15 by 15; the longitudinal section also runs CytoNorm at 15 by 15.\nCytoNorm maps every batch to the mean of all batches and cyCombine to the mean of all cells, while bridgenorm maps to the anchor batch. The effect ratio is read on each method’s own target scale.\nTen simulation seeds crossed with three SOM seeds per cross-sectional scenario, and five per longitudinal one, give ranges, not confidence intervals.\ncyCombine’s bridge options (ref.batch with anchor) were tried and dropped: its per-cluster ComBat stops when a cluster has no cell of the reference batch, which happened in most runs.\nThe longitudinal simulation has four subjects per cohort, one changing marker in one population, and visits in consecutive batches. Studies with visits far apart in time, or with bridge material that ages, may behave differently.\ncyCombine and the bridge-based methods answer different questions. cyCombine removes differences between batches of all cells; bridgenorm and CytoNorm remove only what the bridge samples show. Which is right depends on whether biology can differ between batches.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Compare with CytoNorm and cyCombine on simulated data"
+    ]
+  },
+  {
+    "objectID": "vignettes/goal-distribution.html",
+    "href": "vignettes/goal-distribution.html",
+    "title": "Use case 2: Normalize toward a goal distribution",
+    "section": "",
+    "text": "By default bridgenorm corrects every batch toward one anchor batch. That is not always the target you want. A study may be run in two phases, and the later phase should be put on the scale of the earlier one, so the earlier analysis (gates, clusters, thresholds) still holds. Or one anchor batch may be noisy, and the mean of several batches is a steadier target. CytoNorm offers this through its goal distribution: the mean over batches by default, one goal batch, or goal quantiles from an earlier model.\nbridgenorm has the same choices:\n\n\ntarget = \"anchor\" (the default): the goal is the anchor batch.\n\ntarget = \"virtual\": the goal is the equal-weight mean of all batches. In each SOM node, the goal quantile curve is the mean of the batches’ curves; for the paired shift, each bridge summary is the mean over batches.\n\ntarget = \"virtual\", goal_batches = &lt;batches&gt;: the goal is the equal-weight mean of the given batches only.\n\nThe anchor still sets the bridges and the map, and it may lie outside the goal batches. Batches in goal_batches that are unbridged, or whose bridge donors differ from the anchor’s, are dropped from the goal. No benchmark benefit of a goal over the anchor target is claimed yet; use it when the design asks for it.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 2: Normalize toward a goal distribution"
+    ]
+  },
+  {
+    "objectID": "vignettes/goal-distribution.html#prepare-the-bridgenorm-normalization-step",
+    "href": "vignettes/goal-distribution.html#prepare-the-bridgenorm-normalization-step",
+    "title": "Use case 2: Normalize toward a goal distribution",
+    "section": "Prepare the bridgenorm normalization step",
+    "text": "Prepare the bridgenorm normalization step\n\nlibrary(bridgenorm)\n\nSix batches come from two studies: study 1 ran batches b1 to b3, study 2 batches b4 to b6. Each batch holds two bridge wells of one reference donor and two study samples. Between the studies the instrument changed, so all study 2 batches read marker M higher, by 0.6 in cell state A and 0.4 in state B. On top of that, each batch shifts and stretches M by a small amount of its own. We want every batch on the scale of study 2, so the goal is the mean of b4, b5 and b6. The anchor is b1, which lies outside the goal.\n\nset.seed(2)\nbatches &lt;- paste0(\"b\", 1:6)\ncentre &lt;- c(A = 2, B = 1)\nlin &lt;- c(A = 1, B = 4)\nstudy_shift &lt;- c(A = 0.6, B = 0.4) # study 2 reads M higher\neffect &lt;- lapply(setNames(batches, batches), function(b) {\n  in_study2 &lt;- b %in% c(\"b4\", \"b5\", \"b6\")\n  list(\n    shift = in_study2 * study_shift + c(A = rnorm(1, 0, 0.1), B = rnorm(1, 0, 0.1)),\n    scale = exp(rnorm(1, 0, 0.1))\n  )\n})\nsamples &lt;- data.frame(\n  sample_id = c(outer(c(\"ref1\", \"ref2\", \"s1\", \"s2\"), batches, paste, sep = \"_\")),\n  batch = rep(batches, each = 4),\n  reference_id = rep(c(\"donor\", \"donor\", NA, NA), 6),\n  aliquot = rep(c(\"ref1\", \"ref2\", NA, NA), 6)\n)\nsamples$study &lt;- ifelse(samples$batch %in% c(\"b1\", \"b2\", \"b3\"), \"study1\", \"study2\")\ncells &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  b &lt;- samples$batch[i]\n  do.call(rbind, lapply(c(\"A\", \"B\"), function(k) {\n    truth &lt;- rnorm(300, centre[[k]], 0.3)\n    data.frame(\n      sample_id = samples$sample_id[i],\n      Lin = rnorm(300, lin[[k]], 0.2),\n      M = centre[[k]] + effect[[b]]$scale * (truth - centre[[k]]) + effect[[b]]$shift[[k]]\n    )\n  }))\n}))\ncells$batch &lt;- samples$batch[match(cells$sample_id, samples$sample_id)]\nis_bridge &lt;- !is.na(samples$reference_id[match(cells$sample_id, samples$sample_id)])\n\nThe goal batches are all batches of study 2:\n\ngoal &lt;- unique(samples$batch[samples$study == \"study2\"])\ngoal\n#&gt; [1] \"b4\" \"b5\" \"b6\"",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 2: Normalize toward a goal distribution"
+    ]
+  },
+  {
+    "objectID": "vignettes/goal-distribution.html#train-the-bridgenorm-models",
+    "href": "vignettes/goal-distribution.html#train-the-bridgenorm-models",
+    "title": "Use case 2: Normalize toward a goal distribution",
+    "section": "Train the bridgenorm models",
+    "text": "Train the bridgenorm models\nOne model per goal, so the three targets can be compared: the anchor b1, the mean of all batches, and the mean of study 2.\n\nfit &lt;- function(...) {\n  bn_fit(\n    x = cells[, c(\"sample_id\", \"Lin\", \"M\")],\n    samples = samples,\n    population = rep(\"T\", nrow(cells)),\n    markers = c(\"Lin\", \"M\"),\n    transform = list(name = \"asinh\", cofactor = 5),\n    anchor = \"b1\",\n    grid = c(2, 1),\n    mapping_markers = \"Lin\",\n    seed = 1,\n    train_cells = 300,\n    rlen = 50,\n    ...\n  )\n}\nmodels &lt;- list(\n  anchor = fit(),\n  all_batches = fit(target = \"virtual\"),\n  study2 = fit(target = \"virtual\", goal_batches = goal)\n)\nmodels$study2$settings$goal_batches\n#&gt; [1] \"b4\" \"b5\" \"b6\"\n\nThe goal is recorded in the model and covered by its digest, so a saved model says which batches it normalizes toward.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 2: Normalize toward a goal distribution"
+    ]
+  },
+  {
+    "objectID": "vignettes/goal-distribution.html#apply-the-bridgenorm-models",
+    "href": "vignettes/goal-distribution.html#apply-the-bridgenorm-models",
+    "title": "Use case 2: Normalize toward a goal distribution",
+    "section": "Apply the bridgenorm models",
+    "text": "Apply the bridgenorm models\n\ncorrected &lt;- lapply(models, function(m) {\n  bn_apply(m, cells[, c(\"sample_id\", \"Lin\", \"M\")], samples, rep(\"T\", nrow(cells)))$x$M\n})",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 2: Normalize toward a goal distribution"
+    ]
+  },
+  {
+    "objectID": "vignettes/goal-distribution.html#evaluate-the-quality",
+    "href": "vignettes/goal-distribution.html#evaluate-the-quality",
+    "title": "Use case 2: Normalize toward a goal distribution",
+    "section": "Evaluate the quality",
+    "text": "Evaluate the quality\nDensity plots\nThe density of M in the bridge cells of each batch (study 1 in reds, study 2 in blues), with the goal distribution in purple: the pooled bridge cells of the goal batches before correction, each batch weighted equally. Toward the anchor, every batch moves to study 1’s scale; toward the mean of all batches, every batch lands between the studies; toward the study 2 goal, every batch, study 1 included, moves onto the purple curve.\n\ncolours &lt;- setNames(c(\"#900002\", \"#E66100\", \"#FFB000\", \"#0046A1\", \"#3C9BE6\", \"#6FCFFF\"), batches)\ngoal_cells &lt;- unlist(lapply(goal, function(b) {\n  sample(cells$M[is_bridge & cells$batch == b], 600)\n}))\nop &lt;- par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))\npanels &lt;- list(uncorrected = cells$M, anchor = corrected$anchor, `all batches` = corrected$all_batches,\n  `study 2 goal` = corrected$study2)\nfor (panel in names(panels)) {\n  plot(NULL, xlim = c(-0.5, 4), ylim = c(0, 1.6), xlab = \"M\", ylab = \"Density\", main = panel)\n  for (b in batches) lines(density(panels[[panel]][is_bridge & cells$batch == b]), col = colours[[b]])\n  lines(density(goal_cells), col = \"#7209B7\", lwd = 2.5)\n}\nlegend(\"topright\", legend = c(batches, \"goal\"), col = c(colours, \"#7209B7\"), lwd = c(rep(1, 6), 2.5),\n  bty = \"n\", cex = 0.8)\n\n\n\n\n\n\npar(op)\n\nDistance to the goal\nThe earth mover’s distance (EMD) between each batch’s corrected bridge cells and the goal distribution; lower means closer to the goal. Only the model with the study 2 goal is meant to bring every batch to it; the other two are shown for contrast. Bridge cells were used to fit the models, so this checks that the goal was reached, not how well the correction generalizes; held-out bridge wells do that (see the comparison article).\n\nemd &lt;- function(a, b) mean(abs(quantile(a, ppoints(200)) - quantile(b, ppoints(200))))\nto_goal &lt;- sapply(c(list(uncorrected = cells$M), corrected), function(v) {\n  sapply(setNames(batches, batches), function(b) emd(v[is_bridge & cells$batch == b], goal_cells))\n})\nround(to_goal, 3)\n#&gt;    uncorrected anchor all_batches study2\n#&gt; b1       0.477  0.477       0.240  0.018\n#&gt; b2       0.543  0.477       0.240  0.017\n#&gt; b3       0.426  0.479       0.243  0.018\n#&gt; b4       0.047  0.475       0.239  0.019\n#&gt; b5       0.080  0.478       0.241  0.018\n#&gt; b6       0.088  0.478       0.241  0.018\n\nQuantile-map plots\nIn each node, the study 2 model maps every batch’s quantiles onto the goal’s: the mean of the goal batches’ quantile curves, stored under the virtual key. The maps sit close to the diagonal because the tables are on the pass-1 scale: the pass-1 node shift has already moved every batch to the goal’s location, and the maps correct what is left of each batch’s shape.\n\nq &lt;- models$study2$quantiles\nkey_batch &lt;- sub(\"\\r.*\", \"\", names(q))\nkey_node &lt;- sub(\".*\\r\", \"\", names(q))\nvirtual &lt;- unique(key_batch[!key_batch %in% batches])\nop &lt;- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))\nfor (node in unique(key_node)) {\n  goal_q &lt;- q[[which(key_batch == virtual & key_node == node)]][, \"M\"]\n  node_q &lt;- unlist(lapply(q[key_node == node], function(x) x[, \"M\"]))\n  plot(NULL, xlim = range(node_q), ylim = range(goal_q),\n    xlab = \"Batch quantiles of M\", ylab = \"Goal quantiles of M\", main = node)\n  abline(0, 1, col = \"grey70\", lty = 2)\n  for (b in batches) {\n    i &lt;- which(key_batch == b & key_node == node)\n    if (length(i) == 1) lines(q[[i]][, \"M\"], goal_q, col = colours[[b]], type = \"b\", pch = 20)\n  }\n}\n\n\n\n\n\n\npar(op)",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 2: Normalize toward a goal distribution"
+    ]
+  },
+  {
+    "objectID": "vignettes/goal-distribution.html#notes",
+    "href": "vignettes/goal-distribution.html#notes",
+    "title": "Use case 2: Normalize toward a goal distribution",
+    "section": "Notes",
+    "text": "Notes\n\nA goal set of one batch is the anchor target: use target = \"anchor\" with that batch as anchor.\nWhen the anchor lies outside the goal, the goal must measure every bridge summary the anchor has (each reference donor, population and marker); otherwise bn_fit() stops with a message rather than produce a missing target.\n\nbn_fit_paired() takes the same target and goal_batches arguments.\nTo add later batches to an existing goal without changing earlier corrections, keep the model and apply it (use case 3).",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 2: Normalize toward a goal distribution"
+    ]
+  },
+  {
+    "objectID": "vignettes/bridgenorm.html",
+    "href": "vignettes/bridgenorm.html",
+    "title": "Use case 1: Correct batches with bridge samples",
+    "section": "",
+    "text": "In a multi-batch cytometry study, the same reference material (a bridge sample) is measured in every batch. The differences between the bridge samples measure the technical batch effect. bridgenorm estimates the batch effect from the bridge cells alone and corrects every batch toward one anchor batch. Study samples never enter the fit, so a condition that is confounded with batch cannot shape the correction. The fitted model is frozen with a digest, so it can be applied to new data later without changing earlier corrections (use case 3).\n\nbn_fit() works in two passes. A global paired shift places the bridge cells on a self-organising map (SOM), and a paired shift is estimated per node. The shift, map and node shifts are refitted on the shifted cells. In each batch and node, the batch’s marker quantiles are then mapped onto the anchor’s, and each node’s map is shrunk toward the batch-wide map, small nodes most.\n\nThe data here are simulated, so every cell’s value without the batch effect is known and the correction can be checked against the truth.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 1: Correct batches with bridge samples"
+    ]
+  },
+  {
+    "objectID": "vignettes/bridgenorm.html#prepare-the-bridgenorm-normalization-step",
+    "href": "vignettes/bridgenorm.html#prepare-the-bridgenorm-normalization-step",
+    "title": "Use case 1: Correct batches with bridge samples",
+    "section": "Prepare the bridgenorm normalization step",
+    "text": "Prepare the bridgenorm normalization step\nLoad bridgenorm\n\nlibrary(bridgenorm)\n\nOrganize the data\nbridgenorm takes one table of cells and one table of samples. The cell table has a sample_id column and one column per marker, already transformed (here the values are on an asinh-like scale). The sample table has one row per sample: sample_id, batch, reference_id (the bridge donor, NA for study samples) and optionally aliquot (the bridge well).\nThree batches each hold two bridge wells of one reference donor and two study samples. Cells fall in two cell states, A and B, separated on the marker Lin. Marker M carries the batch effect: in batch b2 it is shifted and compressed, in batch b3 shifted and stretched, and batch b1 is the anchor without an effect. The effect differs between the two cell states, so one shift per batch cannot remove it.\n\nset.seed(1)\ncentre &lt;- c(A = 2, B = 1)\nlin &lt;- c(A = 1, B = 4)\neffect &lt;- list(\n  b1 = list(shift = c(A = 0, B = 0), scale = 1),\n  b2 = list(shift = c(A = 0.4, B = -0.3), scale = 0.6),\n  b3 = list(shift = c(A = -0.2, B = 0.3), scale = 1.4)\n)\nsamples &lt;- data.frame(\n  sample_id = c(outer(c(\"ref1\", \"ref2\", \"s1\", \"s2\"), c(\"b1\", \"b2\", \"b3\"), paste, sep = \"_\")),\n  batch = rep(c(\"b1\", \"b2\", \"b3\"), each = 4),\n  reference_id = rep(c(\"donor\", \"donor\", NA, NA), 3),\n  aliquot = rep(c(\"ref1\", \"ref2\", NA, NA), 3)\n)\ncells &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  b &lt;- samples$batch[i]\n  do.call(rbind, lapply(c(\"A\", \"B\"), function(k) {\n    truth &lt;- rnorm(300, centre[[k]], 0.3)\n    data.frame(\n      sample_id = samples$sample_id[i],\n      state = k,\n      Lin = rnorm(300, lin[[k]], 0.2),\n      M = centre[[k]] + effect[[b]]$scale * (truth - centre[[k]]) + effect[[b]]$shift[[k]],\n      truth = truth\n    )\n  }))\n}))\ncells$batch &lt;- samples$batch[match(cells$sample_id, samples$sample_id)]\nhead(cells)\n#&gt;   sample_id state       Lin        M    truth batch\n#&gt; 1   ref1_b1     A 1.1787347 1.812064 1.812064    b1\n#&gt; 2   ref1_b1     A 0.7905404 2.055093 2.055093    b1\n#&gt; 3   ref1_b1     A 1.3942675 1.749311 1.749311    b1\n#&gt; 4   ref1_b1     A 0.9232736 2.478584 2.478584    b1\n#&gt; 5   ref1_b1     A 1.3308291 2.098852 2.098852    b1\n#&gt; 6   ref1_b1     A 1.3024425 1.753859 1.753859    b1\n\nCheck the bridges and choose the anchor\nEvery batch must share a bridge donor with the anchor. bn_bridges() checks this; bn_reference_noise() reports how noisy each batch’s bridge wells are, to help choose the anchor (the least noisy batch is a good choice).\n\nbn_bridges(samples, anchor = \"b1\")\n#&gt; # A tibble: 2 × 4\n#&gt;   batch n_shared_with_anchor shared_ids bridged\n#&gt;   &lt;chr&gt;                &lt;int&gt; &lt;chr&gt;      &lt;lgl&gt;  \n#&gt; 1 b2                       1 donor      TRUE   \n#&gt; 2 b3                       1 donor      TRUE\nbn_reference_noise(cells[, c(\"sample_id\", \"M\")], samples, rep(\"T\", nrow(cells)), markers = \"M\")\n#&gt; # A tibble: 3 × 8\n#&gt;   batch population marker n_references n_aliquots replicate_sd cell_sd   loo_z\n#&gt;   &lt;chr&gt; &lt;chr&gt;      &lt;chr&gt;         &lt;int&gt;      &lt;int&gt;        &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;\n#&gt; 1 b1    T          M                 1          2      0.00527   0.599 -42.2  \n#&gt; 2 b2    T          M                 1          2      0.00671   0.865   0.755\n#&gt; 3 b3    T          M                 1          2      0.00425   0.487   0.661",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 1: Correct batches with bridge samples"
+    ]
+  },
+  {
+    "objectID": "vignettes/bridgenorm.html#train-the-bridgenorm-model",
+    "href": "vignettes/bridgenorm.html#train-the-bridgenorm-model",
+    "title": "Use case 1: Correct batches with bridge samples",
+    "section": "Train the bridgenorm model",
+    "text": "Train the bridgenorm model\nThe model is fitted on bridge cells only. The anchor, the SOM grid, the mapping markers, the seed and the transform depend on the data and must be given. The other settings have benchmarked defaults; here the SOM training is shortened for the toy data. mapping_markers define the cell states; every marker in markers is corrected, whether or not it is used for mapping.\n\nmodel &lt;- bn_fit(\n  x = cells[, c(\"sample_id\", \"Lin\", \"M\")],\n  samples = samples,\n  population = rep(\"T\", nrow(cells)),\n  markers = c(\"Lin\", \"M\"),\n  transform = list(name = \"asinh\", cofactor = 5),\n  anchor = \"b1\",\n  grid = c(2, 1),\n  mapping_markers = \"Lin\",\n  seed = 1,\n  train_cells = 300, # this toy data has 600 cells per sample\n  rlen = 50\n)\nmodel\n#&gt; &lt;bn_node_quantile_model&gt; | anchor: b1 | nodes per pass: 2 | quantile tables: 6 | digest: a56b4bf471543651276ccdbcc4768777\n\npopulation sets the strata of the global pre-shift and of the fallback for cells whose node has no effect. One label for all cells, as here, is valid.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 1: Correct batches with bridge samples"
+    ]
+  },
+  {
+    "objectID": "vignettes/bridgenorm.html#apply-the-bridgenorm-model",
+    "href": "vignettes/bridgenorm.html#apply-the-bridgenorm-model",
+    "title": "Use case 1: Correct batches with bridge samples",
+    "section": "Apply the bridgenorm model",
+    "text": "Apply the bridgenorm model\nbn_apply() applies the frozen model to all cells, study samples included.\n\nres &lt;- bn_apply(model, cells[, c(\"sample_id\", \"Lin\", \"M\")], samples, rep(\"T\", nrow(cells)))\n\nres$x holds the corrected data in the input’s shape and row order. res$actions says what was done for every pass, batch, node and marker, and why. Rows reading abstain kept raw values; bn_apply() also sends a message when a whole batch was left raw. Check it before using the result.\n\ntable(res$actions$batch, res$actions$reason_code)\n#&gt;     \n#&gt;      frozen_effect node_quantile\n#&gt;   b1             4             4\n#&gt;   b2             4             4\n#&gt;   b3             4             4",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 1: Correct batches with bridge samples"
+    ]
+  },
+  {
+    "objectID": "vignettes/bridgenorm.html#evaluate-the-quality",
+    "href": "vignettes/bridgenorm.html#evaluate-the-quality",
+    "title": "Use case 1: Correct batches with bridge samples",
+    "section": "Evaluate the quality",
+    "text": "Evaluate the quality\nDensity plots\nThe density of M in study cells per batch, before and after correction. After correction, batches b2 and b3 lie on the anchor b1, their peaks at the anchor’s width. Each node’s quantile map is pulled toward the batch-wide map (shrink_k = 1000, so small nodes borrow most). The pull is toward the batch-wide map evaluated at the node’s own values (shrink_target = \"value\"), so a stretch or compression shared by all nodes, as in b2 and b3, is kept. A smaller shrink_k trusts each node’s own map more.\n\nstudy &lt;- is.na(samples$reference_id[match(cells$sample_id, samples$sample_id)])\ncolours &lt;- c(b1 = \"black\", b2 = \"#E69F00\", b3 = \"#0072B2\")\nop &lt;- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))\nfor (panel in c(\"uncorrected\", \"corrected\")) {\n  value &lt;- if (panel == \"uncorrected\") cells$M else res$x$M\n  plot(NULL, xlim = c(-0.5, 3.5), ylim = c(0, 1.6), xlab = \"M\", ylab = \"Density\", main = panel)\n  for (b in names(colours)) {\n    lines(density(value[study & cells$batch == b]), col = colours[[b]], lwd = 1.5)\n  }\n  legend(\"topright\", legend = names(colours), col = colours, lwd = 1.5, bty = \"n\")\n}\n\n\n\n\n\n\npar(op)\n\nQuantile-map plots\nThe quantile maps are the second step of the correction. For each second-pass node, a batch’s quantiles of M after the pass-1 shift (x axis) are mapped onto the anchor’s (y axis). A map on the diagonal changes nothing; a map steeper than the diagonal stretches, as for the compressed batch b2, and a flatter one compresses, as for the stretched batch b3. The anchor’s own map is the diagonal.\n\nkey_batch &lt;- sub(\"\\r.*\", \"\", names(model$quantiles))\nkey_node &lt;- sub(\".*\\r\", \"\", names(model$quantiles))\nop &lt;- par(mfrow = c(1, length(unique(key_node))), mar = c(4, 4, 2, 1))\nfor (node in unique(key_node)) {\n  anchor_q &lt;- model$quantiles[[which(key_batch == \"b1\" & key_node == node)]][, \"M\"]\n  node_q &lt;- unlist(lapply(model$quantiles[key_node == node], function(q) q[, \"M\"]))\n  plot(NULL, xlim = range(node_q), ylim = range(anchor_q),\n    xlab = \"Batch quantiles of M\", ylab = \"Anchor quantiles of M\", main = node)\n  abline(0, 1, col = \"grey70\", lty = 2)\n  for (b in names(colours)) {\n    i &lt;- which(key_batch == b & key_node == node)\n    if (length(i) == 1) lines(model$quantiles[[i]][, \"M\"], anchor_q, col = colours[[b]], lwd = 1.5, type = \"b\", pch = 20)\n  }\n}\nlegend(\"topleft\", legend = names(colours), col = colours, lwd = 1.5, bty = \"n\")\n\n\n\n\n\n\npar(op)\n\nError against the truth\nIn real data the truth is unknown, and the held-out bridge wells take its place (see the comparison article). Here each study cell’s value without the batch effect is known.\n\nerror &lt;- data.frame(\n  batch = cells$batch[study],\n  uncorrected = abs(cells$M[study] - cells$truth[study]),\n  corrected = abs(res$x$M[study] - cells$truth[study])\n)\naggregate(cbind(uncorrected, corrected) ~ batch, data = error, FUN = mean)\n#&gt;   batch uncorrected    corrected\n#&gt; 1    b1   0.0000000 4.440892e-18\n#&gt; 2    b2   0.3544671 3.833640e-02\n#&gt; 3    b3   0.2534930 3.357202e-02\n\nEarth mover’s distance between batches\nThe earth mover’s distance (EMD) between two batches’ distributions of a marker is 0 when they match. For the study cells of each batch against the anchor:\n\nemd &lt;- function(a, b) mean(abs(quantile(a, ppoints(200)) - quantile(b, ppoints(200))))\nsapply(c(b2 = \"b2\", b3 = \"b3\"), function(b) {\n  c(\n    uncorrected = emd(cells$M[study & cells$batch == b], cells$M[study & cells$batch == \"b1\"]),\n    corrected = emd(res$x$M[study & cells$batch == b], res$x$M[study & cells$batch == \"b1\"])\n  )\n})\n#&gt;                     b2         b3\n#&gt; uncorrected 0.34737481 0.11756999\n#&gt; corrected   0.03403882 0.03111684",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 1: Correct batches with bridge samples"
+    ]
+  },
+  {
+    "objectID": "vignettes/bridgenorm.html#save-the-model",
+    "href": "vignettes/bridgenorm.html#save-the-model",
+    "title": "Use case 1: Correct batches with bridge samples",
+    "section": "Save the model",
+    "text": "Save the model\nbn_save() stores the model with its digest; bn_load() refuses a file whose contents changed after saving.\n\npath &lt;- tempfile(fileext = \".rds\")\nbn_save(model, path)\nidentical(bn_load(path), model)\n#&gt; [1] TRUE",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 1: Correct batches with bridge samples"
+    ]
+  },
+  {
+    "objectID": "vignettes/bridgenorm.html#next",
+    "href": "vignettes/bridgenorm.html#next",
+    "title": "Use case 1: Correct batches with bridge samples",
+    "section": "Next",
+    "text": "Next\n\n\nUse case 2: Normalize toward a goal distribution: correct every batch toward the mean of a set of batches, for example one study, instead of one anchor batch.\n\nUse case 3: Correct later batches with a frozen model: longitudinal studies where batches arrive over time.\n\nshrink_k = \"eb\" replaces the single pseudo-count with one per marker, estimated by empirical Bayes, never below 300. It is kept for study; in benchmarks it did not beat the scalar default.",
+    "crumbs": [
+      "Home",
+      "Articles",
+      "Use case 1: Correct batches with bridge samples"
+    ]
+  },
+  {
+    "objectID": "NEWS.html",
+    "href": "NEWS.html",
+    "title": "bridgenorm 1.1.0",
+    "section": "",
+    "text": "bn_fit() now defaults to shrink_target = \"value\" and shrink_k = 1000 (1.0.0: \"quantile\" and 300). Corrected values change for every fit that relied on the defaults; pass shrink_target = \"quantile\", shrink_k = 300 to reproduce 1.0.0. Models saved by 1.0.0 still load and apply unchanged.\nThe new defaults were chosen by tuning on two real multi-batch cytometry studies, scored by the earth mover’s distance between batches on held-out bridge wells. The comparison used every fold, including those used to pick the settings, so the gain is an upper bound. Check the defaults on new data.\nsettings$shrink_target is now always recorded. A model without it used \"quantile\".\n\n\n\n\n\nbn_fit(shrink_target = ): \"value\" shrinks each node’s offset curve toward the batch-wide map evaluated at the node’s own target quantiles, so an intensity-dependent effect shared by all nodes is not shrunk toward a wrong curve. \"quantile\" keeps the 1.0.0 rule.\nbn_fit(shrink_reweight = TRUE) computes the batch-wide curve with weights that give each batch the target’s cell-state mix of bridge cells. Default FALSE.\nbn_fit(quantile_maps = FALSE) keeps no quantile tables, so every cell takes the pass-2 node shift (an ablation). Default TRUE.",
+    "crumbs": [
+      "Home",
+      "News"
+    ]
+  },
+  {
+    "objectID": "NEWS.html#default-changes",
+    "href": "NEWS.html#default-changes",
+    "title": "bridgenorm 1.1.0",
+    "section": "",
+    "text": "bn_fit() now defaults to shrink_target = \"value\" and shrink_k = 1000 (1.0.0: \"quantile\" and 300). Corrected values change for every fit that relied on the defaults; pass shrink_target = \"quantile\", shrink_k = 300 to reproduce 1.0.0. Models saved by 1.0.0 still load and apply unchanged.\nThe new defaults were chosen by tuning on two real multi-batch cytometry studies, scored by the earth mover’s distance between batches on held-out bridge wells. The comparison used every fold, including those used to pick the settings, so the gain is an upper bound. Check the defaults on new data.\nsettings$shrink_target is now always recorded. A model without it used \"quantile\".",
+    "crumbs": [
+      "Home",
+      "News"
+    ]
+  },
+  {
+    "objectID": "NEWS.html#new",
+    "href": "NEWS.html#new",
+    "title": "bridgenorm 1.1.0",
+    "section": "",
+    "text": "bn_fit(shrink_target = ): \"value\" shrinks each node’s offset curve toward the batch-wide map evaluated at the node’s own target quantiles, so an intensity-dependent effect shared by all nodes is not shrunk toward a wrong curve. \"quantile\" keeps the 1.0.0 rule.\nbn_fit(shrink_reweight = TRUE) computes the batch-wide curve with weights that give each batch the target’s cell-state mix of bridge cells. Default FALSE.\nbn_fit(quantile_maps = FALSE) keeps no quantile tables, so every cell takes the pass-2 node shift (an ablation). Default TRUE.",
+    "crumbs": [
+      "Home",
+      "News"
+    ]
+  },
+  {
+    "objectID": "NEWS.html#breaking-changes",
+    "href": "NEWS.html#breaking-changes",
+    "title": "bridgenorm 1.1.0",
+    "section": "Breaking changes",
+    "text": "Breaking changes\n\nModels saved by 0.x do not load; refit them. Schema strings are now bn_node_quantile_model/2, bn_node_model/2 and bn_paired_model/2.\nEvery model has the parent class bn_model. bn_fit_paired() returns class c(\"bn_paired_model\", \"bn_model\") (was bn_model).\nbn_fit() drops the single-valued arguments method, eb_settings, assignment and tail. Their values are fixed and still recorded in settings.\nIn the actions of a bn_fit() result, the SOM node column is node (was population).\nDead fields are removed: hierarchy from paired models, the duplicate global model from node models, eb_settings and assignment from node settings.\nseed must be a whole number. kohonen moves from Suggests to Imports.",
+    "crumbs": [
+      "Home",
+      "News"
+    ]
+  },
+  {
+    "objectID": "NEWS.html#new-1",
+    "href": "NEWS.html#new-1",
+    "title": "bridgenorm 1.1.0",
+    "section": "New",
+    "text": "New\n\ngoal_batches: with target = \"virtual\", bn_fit() and bn_fit_paired() map every batch toward the equal-weight mean of a chosen set of batches, for example the batches of one study, as CytoNorm’s goal distribution. Unbridged or donor-mismatched goal batches are dropped; a goal lacking a reference summary the anchor has stops the fit. No benchmark benefit is claimed yet.\nbn_fit() warns when a batch gets no quantile maps (donors that pass min_cells differ from the anchor’s) and when bridge donors’ cell shares differ from the anchor’s by more than 10 percentage points.\nbn_apply() sends a message naming batches it left entirely raw.",
+    "crumbs": [
+      "Home",
+      "News"
+    ]
+  },
+  {
+    "objectID": "NEWS.html#fixes",
+    "href": "NEWS.html#fixes",
+    "title": "bridgenorm 1.1.0",
+    "section": "Fixes",
+    "text": "Fixes\n\nbn_apply() no longer stops when a marker has one value in a node’s quantile table: that marker keeps the pass-2 node shift (reason code node_quantile_tied).\nAn empty or blank sample_id, batch, reference_id or aliquot, and carriage returns in ids or population labels, now stop with the samples named. Before, \"\" silently made study samples a bridge donor.\nQuantile tables are built only for batches whose aliquots pass min_cells, the gate the shift passes use.\nThe fit no longer depends on the collation locale or on the session’s RNG kind. Results on data whose ids sort the same in every locale are unchanged.\nThe digest leaves out timestamps and hashes a canonical form, so two fits on the same data have the same digest.\nbn_reference_noise() takes transform as optional. Choice errors name the function the user called. bn_load() checks that the file exists.",
+    "crumbs": [
+      "Home",
+      "News"
+    ]
+  },
+  {
+    "objectID": "CITATION.html",
+    "href": "CITATION.html",
+    "title": "Citation",
+    "section": "",
+    "text": "Citation\n\nManurung M (2026). bridgenorm: Cytometry Batch Correction from Bridge Samples. R package version, https://github.com/mdmanurung/bridgenorm.",
+    "crumbs": [
+      "Home",
+      "Citation"
+    ]
+  },
+  {
+    "objectID": "man/bn_fit_paired.html",
+    "href": "man/bn_fit_paired.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "For each batch, population and marker, the effect is the mean over the references shared with the anchor batch of (reference summary in the batch minus the same reference’s summary in the anchor). Reference summaries are equal-weight means of aliquot means. Nothing is shrunk. This is the baseline every bridgenorm model must beat, the estimator bn_fit uses in each SOM node, and the one bn_apply uses for batches unseen at fit time.\n\nbn_fit_paired(\n  x,\n  samples,\n  population,\n  markers,\n  transform,\n  anchor,\n  min_cells = 50,\n  unbridged = \"abstain\",\n  target = \"anchor\",\n  goal_batches = NULL,\n  sample_ids = NULL\n)\n\n\n\n\n\nx\n\n\nA numeric matrix (cells by markers) or a data frame with one row per cell, already transformed. A data frame needs a sample_id column unless sample_ids is given.\n\n\n\n\nsamples\n\n\nData frame, one row per sample: sample_id, batch, reference_id (the bridge donor; NA for study samples) and optionally aliquot.\n\n\n\n\npopulation\n\n\nPer-cell population labels, one per row of x, frozen before correction.\n\n\n\n\nmarkers\n\n\nMarker columns to correct.\n\n\n\n\ntransform\n\n\nlist(name = “asinh”, cofactor = &lt;number&gt;): the scale x is on. It is recorded, never applied.\n\n\n\n\nanchor\n\n\nThe batch that defines the target scale.\n\n\n\n\nmin_cells\n\n\nMinimum cells per reference aliquot summary and per (batch, node) quantile table.\n\n\n\n\nunbridged\n\n\n“abstain” leaves a batch that shares no bridge donor with the anchor raw and flags it; “stop” refuses the fit.\n\n\n\n\ntarget\n\n\n“anchor” corrects every batch to the anchor batch. “virtual” replaces each anchor reference summary by its mean over the bridged batches, so the anchor batch gets an effect too. The anchor still sets the bridges.\n\n\n\n\ngoal_batches\n\n\nNULL, or with target = “virtual” two or more batches whose equal-weight mean is the goal (for example the batches of one study), as CytoNorm’s goal distribution. Goal batches that are unbridged or whose reference donors differ from the anchor’s are dropped. The anchor still sets the bridges and the map and may lie outside the goal; the fit stops when the goal lacks a reference summary the anchor has. Nodes without a goal quantile table take the pass-2 node shift.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\nse_donor is the SD of the paired differences over references divided by the square root of their number (NA with one reference), with df = number of references - 1. Anchor rows have estimate 0 and support = “anchor”. With target = “virtual” each reference summary of the anchor is replaced by its mean over the bridged batches, so the anchor batch gets an effect too.\nWith unbridged = “abstain”, a batch that shares no reference with the anchor (after min_cells) gets no effect, so bn_apply leaves its cells raw and flags them; “stop” refuses the fit.\n\nA bn_model: a list with method = “paired_shift”, settings, markers, transform, anchor, effects (one row per batch, population and marker: estimate, se_donor, df, donor and aliquot counts, support), targets (anchor summaries), bridges, excluded, known_batches and digest.\n\nbn_fit, bn_apply\n\n\nlibrary(\"bridgenorm\")\n\nset.seed(1)\nbatches &lt;- c(\"b1\", \"b2\", \"b3\")\nsamples &lt;- expand.grid(donor = c(\"D1\", \"D2\"), batch = batches, stringsAsFactors = FALSE)\nsamples$sample_id &lt;- paste(samples$donor, samples$batch, sep = \"_\")\nsamples$reference_id &lt;- samples$donor\nshift &lt;- c(b1 = 0, b2 = 0.5, b3 = -0.3)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = rnorm(100, 2 + shift[[samples$batch[i]]], 0.3)\n  )\n}))\nmodel &lt;- bn_fit_paired(\n  x, samples, population = rep(\"T\", nrow(x)), markers = \"Lin\",\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  min_cells = 20\n)\nmodel$effects[, c(\"batch\", \"estimate\", \"se_donor\")]\n\n# A tibble: 3 × 3\n  batch estimate se_donor\n  &lt;chr&gt;    &lt;dbl&gt;    &lt;dbl&gt;\n1 b1       0       0     \n2 b2       0.502   0.0253\n3 b3      -0.323   0.0212",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_fit_paired"
+    ]
+  },
+  {
+    "objectID": "man/bn_fit_paired.html#fit-a-frozen-paired-shift-model",
+    "href": "man/bn_fit_paired.html#fit-a-frozen-paired-shift-model",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "For each batch, population and marker, the effect is the mean over the references shared with the anchor batch of (reference summary in the batch minus the same reference’s summary in the anchor). Reference summaries are equal-weight means of aliquot means. Nothing is shrunk. This is the baseline every bridgenorm model must beat, the estimator bn_fit uses in each SOM node, and the one bn_apply uses for batches unseen at fit time.\n\nbn_fit_paired(\n  x,\n  samples,\n  population,\n  markers,\n  transform,\n  anchor,\n  min_cells = 50,\n  unbridged = \"abstain\",\n  target = \"anchor\",\n  goal_batches = NULL,\n  sample_ids = NULL\n)\n\n\n\n\n\nx\n\n\nA numeric matrix (cells by markers) or a data frame with one row per cell, already transformed. A data frame needs a sample_id column unless sample_ids is given.\n\n\n\n\nsamples\n\n\nData frame, one row per sample: sample_id, batch, reference_id (the bridge donor; NA for study samples) and optionally aliquot.\n\n\n\n\npopulation\n\n\nPer-cell population labels, one per row of x, frozen before correction.\n\n\n\n\nmarkers\n\n\nMarker columns to correct.\n\n\n\n\ntransform\n\n\nlist(name = “asinh”, cofactor = &lt;number&gt;): the scale x is on. It is recorded, never applied.\n\n\n\n\nanchor\n\n\nThe batch that defines the target scale.\n\n\n\n\nmin_cells\n\n\nMinimum cells per reference aliquot summary and per (batch, node) quantile table.\n\n\n\n\nunbridged\n\n\n“abstain” leaves a batch that shares no bridge donor with the anchor raw and flags it; “stop” refuses the fit.\n\n\n\n\ntarget\n\n\n“anchor” corrects every batch to the anchor batch. “virtual” replaces each anchor reference summary by its mean over the bridged batches, so the anchor batch gets an effect too. The anchor still sets the bridges.\n\n\n\n\ngoal_batches\n\n\nNULL, or with target = “virtual” two or more batches whose equal-weight mean is the goal (for example the batches of one study), as CytoNorm’s goal distribution. Goal batches that are unbridged or whose reference donors differ from the anchor’s are dropped. The anchor still sets the bridges and the map and may lie outside the goal; the fit stops when the goal lacks a reference summary the anchor has. Nodes without a goal quantile table take the pass-2 node shift.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\nse_donor is the SD of the paired differences over references divided by the square root of their number (NA with one reference), with df = number of references - 1. Anchor rows have estimate 0 and support = “anchor”. With target = “virtual” each reference summary of the anchor is replaced by its mean over the bridged batches, so the anchor batch gets an effect too.\nWith unbridged = “abstain”, a batch that shares no reference with the anchor (after min_cells) gets no effect, so bn_apply leaves its cells raw and flags them; “stop” refuses the fit.\n\nA bn_model: a list with method = “paired_shift”, settings, markers, transform, anchor, effects (one row per batch, population and marker: estimate, se_donor, df, donor and aliquot counts, support), targets (anchor summaries), bridges, excluded, known_batches and digest.\n\nbn_fit, bn_apply\n\n\nlibrary(\"bridgenorm\")\n\nset.seed(1)\nbatches &lt;- c(\"b1\", \"b2\", \"b3\")\nsamples &lt;- expand.grid(donor = c(\"D1\", \"D2\"), batch = batches, stringsAsFactors = FALSE)\nsamples$sample_id &lt;- paste(samples$donor, samples$batch, sep = \"_\")\nsamples$reference_id &lt;- samples$donor\nshift &lt;- c(b1 = 0, b2 = 0.5, b3 = -0.3)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = rnorm(100, 2 + shift[[samples$batch[i]]], 0.3)\n  )\n}))\nmodel &lt;- bn_fit_paired(\n  x, samples, population = rep(\"T\", nrow(x)), markers = \"Lin\",\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  min_cells = 20\n)\nmodel$effects[, c(\"batch\", \"estimate\", \"se_donor\")]\n\n# A tibble: 3 × 3\n  batch estimate se_donor\n  &lt;chr&gt;    &lt;dbl&gt;    &lt;dbl&gt;\n1 b1       0       0     \n2 b2       0.502   0.0253\n3 b3      -0.323   0.0212",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_fit_paired"
+    ]
+  },
+  {
+    "objectID": "man/bn_save.html",
+    "href": "man/bn_save.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "bn_save() checks the digest and writes the model with saveRDS(). bn_load() reads it and checks the schema and digest again, so a changed file fails to load.\n\nbn_save(model, path)\n\nbn_load(path)\n\n\n\n\n\nmodel\n\n\nA bn_model, bn_node_model or bn_node_quantile_model.\n\n\n\n\npath\n\n\nFile path.\n\n\n\nbn_save() returns path invisibly; bn_load() returns the model.\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nmodel &lt;- bn_fit(\n  x, samples, population = rep(\"T\", nrow(x)), markers = c(\"Lin\", \"M\"),\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  grid = c(2, 1), mapping_markers = \"Lin\", seed = 1, rlen = 20\n)\npath &lt;- tempfile(fileext = \".rds\")\nbn_save(model, path)\nidentical(bn_load(path)$digest, model$digest)\n\n[1] TRUE",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_save"
+    ]
+  },
+  {
+    "objectID": "man/bn_save.html#save-and-load-a-frozen-bridgenorm-model",
+    "href": "man/bn_save.html#save-and-load-a-frozen-bridgenorm-model",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "bn_save() checks the digest and writes the model with saveRDS(). bn_load() reads it and checks the schema and digest again, so a changed file fails to load.\n\nbn_save(model, path)\n\nbn_load(path)\n\n\n\n\n\nmodel\n\n\nA bn_model, bn_node_model or bn_node_quantile_model.\n\n\n\n\npath\n\n\nFile path.\n\n\n\nbn_save() returns path invisibly; bn_load() returns the model.\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nmodel &lt;- bn_fit(\n  x, samples, population = rep(\"T\", nrow(x)), markers = c(\"Lin\", \"M\"),\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  grid = c(2, 1), mapping_markers = \"Lin\", seed = 1, rlen = 20\n)\npath &lt;- tempfile(fileext = \".rds\")\nbn_save(model, path)\nidentical(bn_load(path)$digest, model$digest)\n\n[1] TRUE",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_save"
+    ]
+  },
+  {
+    "objectID": "man/bn_apply.html",
+    "href": "man/bn_apply.html",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "Corrects x with the frozen effects and reports one action per (batch, population, marker). Earlier effects never change, so values corrected before stay the same when new batches arrive.\n\nbn_apply(\n  model,\n  x,\n  samples,\n  population,\n  transform = model\\$transform,\n  unsupported = \"abstain\",\n  sample_ids = NULL\n)\n\n\n\n\n\nmodel\n\n\nA model from bn_fit or bn_fit_paired.\n\n\n\n\nx\n\n\nData in the same form as for bn_fit.\n\n\n\n\nsamples\n\n\nSample table covering every sample in x.\n\n\n\n\npopulation\n\n\nPer-cell population labels for x.\n\n\n\n\ntransform\n\n\nThe scale x is on; it must equal the model’s. Defaults to the model’s own transform.\n\n\n\n\nunsupported\n\n\n“abstain” keeps uncorrectable values and reports them; “error” stops when any action is an abstention.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\nArrival cases:\n\n\nKnown batch\n\n\nUse the frozen effect. Reference samples in x are not used again.\n\n\nNew batch with a bridging reference\n\n\nA reference in the new batch also has a frozen summary in the anchor batch. Its effect is the mean paired difference of its own reference cells to the frozen anchor summaries, without shrinkage. The effect is added to a copy of the model (returned as model); old effects are untouched.\n\n\nNew batch without a bridging reference\n\n\nAbstain.\n\n\nKnown batch or population without an effect\n\n\nAbstain. This covers batches dropped by unbridged = “abstain”.\n\n\nAbstain keeps the original value exactly.\n\nA bn_result: a list with x (corrected data, same shape, row order and columns as the input), actions (one row per batch, population and marker: action, reason_code, reason, estimate and support columns, n_cells), model (the input model, or a copy extended with new-batch effects, with a new digest and parent_digest), excluded and aliquot_source.\n\nbn_fit\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nmodel &lt;- bn_fit(\n  x, samples, population = rep(\"T\", nrow(x)), markers = c(\"Lin\", \"M\"),\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  grid = c(2, 1), mapping_markers = \"Lin\", seed = 1, rlen = 20\n)\nres &lt;- bn_apply(model, x, samples, rep(\"T\", nrow(x)))\nres\n\n&lt;bn_result&gt; 16 applied, 0 abstained (batch x population x marker) | model digest: e9594c9e5a3711d617740f0482294b01 \n\n# Mean of M in the study samples per batch, before and after.\ntapply(x$M[startsWith(x$sample_id, \"s\")], x$sample_id[startsWith(x$sample_id, \"s\")], mean)\n\n    s_b1     s_b2 \n1.499544 1.999908 \n\ntapply(res$x$M[startsWith(x$sample_id, \"s\")], x$sample_id[startsWith(x$sample_id, \"s\")], mean)\n\n    s_b1     s_b2 \n1.499544 1.490305",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_apply"
+    ]
+  },
+  {
+    "objectID": "man/bn_apply.html#apply-a-frozen-bridgenorm-model-to-new-or-old-data",
+    "href": "man/bn_apply.html#apply-a-frozen-bridgenorm-model-to-new-or-old-data",
+    "title": "bridgenorm",
+    "section": "",
+    "text": "Corrects x with the frozen effects and reports one action per (batch, population, marker). Earlier effects never change, so values corrected before stay the same when new batches arrive.\n\nbn_apply(\n  model,\n  x,\n  samples,\n  population,\n  transform = model\\$transform,\n  unsupported = \"abstain\",\n  sample_ids = NULL\n)\n\n\n\n\n\nmodel\n\n\nA model from bn_fit or bn_fit_paired.\n\n\n\n\nx\n\n\nData in the same form as for bn_fit.\n\n\n\n\nsamples\n\n\nSample table covering every sample in x.\n\n\n\n\npopulation\n\n\nPer-cell population labels for x.\n\n\n\n\ntransform\n\n\nThe scale x is on; it must equal the model’s. Defaults to the model’s own transform.\n\n\n\n\nunsupported\n\n\n“abstain” keeps uncorrectable values and reports them; “error” stops when any action is an abstention.\n\n\n\n\nsample_ids\n\n\nOptional sample id per row; required for a matrix x.\n\n\n\nArrival cases:\n\n\nKnown batch\n\n\nUse the frozen effect. Reference samples in x are not used again.\n\n\nNew batch with a bridging reference\n\n\nA reference in the new batch also has a frozen summary in the anchor batch. Its effect is the mean paired difference of its own reference cells to the frozen anchor summaries, without shrinkage. The effect is added to a copy of the model (returned as model); old effects are untouched.\n\n\nNew batch without a bridging reference\n\n\nAbstain.\n\n\nKnown batch or population without an effect\n\n\nAbstain. This covers batches dropped by unbridged = “abstain”.\n\n\nAbstain keeps the original value exactly.\n\nA bn_result: a list with x (corrected data, same shape, row order and columns as the input), actions (one row per batch, population and marker: action, reason_code, reason, estimate and support columns, n_cells), model (the input model, or a copy extended with new-batch effects, with a new digest and parent_digest), excluded and aliquot_source.\n\nbn_fit\n\n\nlibrary(\"bridgenorm\")\n\n# Two batches, each with two bridge wells of one reference donor and one\n# study sample. Marker M is shifted by 0.5 in batch b2; Lin separates two\n# cell states.\nset.seed(1)\nsamples &lt;- data.frame(\n  sample_id = c(\"r1_b1\", \"r2_b1\", \"s_b1\", \"r1_b2\", \"r2_b2\", \"s_b2\"),\n  batch = rep(c(\"b1\", \"b2\"), each = 3),\n  reference_id = rep(c(\"donor\", \"donor\", NA), 2),\n  aliquot = rep(c(\"a1\", \"a2\", NA), 2)\n)\nx &lt;- do.call(rbind, lapply(seq_len(nrow(samples)), function(i) {\n  shift &lt;- if (samples$batch[i] == \"b2\") 0.5 else 0\n  data.frame(\n    sample_id = samples$sample_id[i],\n    Lin = c(rnorm(200, 1, 0.2), rnorm(200, 4, 0.2)),\n    M = c(rnorm(200, 2, 0.3), rnorm(200, 1, 0.3)) + shift\n  )\n}))\nmodel &lt;- bn_fit(\n  x, samples, population = rep(\"T\", nrow(x)), markers = c(\"Lin\", \"M\"),\n  transform = list(name = \"asinh\", cofactor = 5), anchor = \"b1\",\n  grid = c(2, 1), mapping_markers = \"Lin\", seed = 1, rlen = 20\n)\nres &lt;- bn_apply(model, x, samples, rep(\"T\", nrow(x)))\nres\n\n&lt;bn_result&gt; 16 applied, 0 abstained (batch x population x marker) | model digest: e9594c9e5a3711d617740f0482294b01 \n\n# Mean of M in the study samples per batch, before and after.\ntapply(x$M[startsWith(x$sample_id, \"s\")], x$sample_id[startsWith(x$sample_id, \"s\")], mean)\n\n    s_b1     s_b2 \n1.499544 1.999908 \n\ntapply(res$x$M[startsWith(x$sample_id, \"s\")], x$sample_id[startsWith(x$sample_id, \"s\")], mean)\n\n    s_b1     s_b2 \n1.499544 1.490305",
+    "crumbs": [
+      "Home",
+      "Reference",
+      "bn_apply"
+    ]
+  }
+]

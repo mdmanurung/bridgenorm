@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" width="960" height="380" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <title>bridgenorm workflow</title>
+  <desc>Each batch holds bridge samples from the same reference donor or donors, plus study samples. bn_fit() learns node shifts and quantile maps from bridge cells only and returns a frozen model. bn_apply() corrects all cells toward the anchor batch.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+  </defs>
+  <rect width="960" height="380" fill="#ffffff"/>
+
+  <!-- Batches -->
+  <text x="20" y="28" font-weight="bold" font-size="14" fill="#222">1  Design: the same bridge donor(s) in every batch</text>
+  <g>
+    <rect x="20" y="45" width="120" height="270" rx="8" fill="#fff4e5" stroke="#D55E00" stroke-width="2"/>
+    <text x="80" y="66" text-anchor="middle" font-weight="bold" fill="#D55E00">Batch 1</text>
+    <text x="80" y="82" text-anchor="middle" font-size="11" fill="#D55E00">anchor</text>
+    <rect x="35" y="95" width="90" height="40" rx="5" fill="#7b5ea7"/>
+    <text x="80" y="113" text-anchor="middle" fill="#fff" font-size="11">bridge</text>
+    <text x="80" y="127" text-anchor="middle" fill="#fff" font-size="11">donor(s) R</text>
+    <rect x="35" y="150" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <rect x="35" y="192" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <rect x="35" y="234" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <text x="80" y="290" text-anchor="middle" font-size="11" fill="#555">study samples</text>
+  </g>
+  <g>
+    <rect x="155" y="45" width="120" height="270" rx="8" fill="#f5f5f5" stroke="#888" stroke-width="1.5"/>
+    <text x="215" y="66" text-anchor="middle" font-weight="bold" fill="#333">Batch 2</text>
+    <rect x="170" y="95" width="90" height="40" rx="5" fill="#7b5ea7"/>
+    <text x="215" y="113" text-anchor="middle" fill="#fff" font-size="11">bridge</text>
+    <text x="215" y="127" text-anchor="middle" fill="#fff" font-size="11">donor(s) R</text>
+    <rect x="170" y="150" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <rect x="170" y="192" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <rect x="170" y="234" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <text x="215" y="290" text-anchor="middle" font-size="11" fill="#555">study samples</text>
+  </g>
+  <g>
+    <rect x="290" y="45" width="120" height="270" rx="8" fill="#f5f5f5" stroke="#888" stroke-width="1.5"/>
+    <text x="350" y="66" text-anchor="middle" font-weight="bold" fill="#333">Batch 3</text>
+    <rect x="305" y="95" width="90" height="40" rx="5" fill="#7b5ea7"/>
+    <text x="350" y="113" text-anchor="middle" fill="#fff" font-size="11">bridge</text>
+    <text x="350" y="127" text-anchor="middle" fill="#fff" font-size="11">donor(s) R</text>
+    <rect x="305" y="150" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <rect x="305" y="192" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <rect x="305" y="234" width="90" height="34" rx="5" fill="#d9d9d9"/>
+    <text x="350" y="290" text-anchor="middle" font-size="11" fill="#555">study samples</text>
+  </g>
+  <text x="215" y="340" text-anchor="middle" font-size="11" fill="#555">bridge differences between batches are taken as batch effect</text>
+
+  <!-- Fit -->
+  <text x="455" y="28" font-weight="bold" font-size="14" fill="#222">2  Fit on bridge cells only</text>
+  <path d="M410,115 L470,115" stroke="#7b5ea7" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+  <rect x="475" y="72" width="190" height="88" rx="8" fill="#ede7f6" stroke="#7b5ea7" stroke-width="2"/>
+  <text x="570" y="98" text-anchor="middle" font-family="Menlo, Consolas, monospace" font-weight="bold" fill="#4a3a6b">bn_fit()</text>
+  <text x="570" y="118" text-anchor="middle" font-size="11" fill="#333">node shifts + quantile maps,</text>
+  <text x="570" y="133" text-anchor="middle" font-size="11" fill="#333">batch → anchor</text>
+  <text x="570" y="150" text-anchor="middle" font-size="11" fill="#333">study samples never enter</text>
+  <path d="M570,160 L570,195" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <rect x="470" y="200" width="200" height="58" rx="8" fill="#ffffff" stroke="#444" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="570" y="223" text-anchor="middle" font-weight="bold" fill="#333">frozen model</text>
+  <text x="570" y="241" text-anchor="middle" font-size="11" fill="#555">digest; bn_save() / bn_load()</text>
+
+  <!-- Apply -->
+  <text x="705" y="28" font-weight="bold" font-size="14" fill="#222">3  Apply to every cell</text>
+  <path d="M670,229 L725,229" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M410,250 C 440,330 640,320 730,262" stroke="#999" stroke-width="2" fill="none" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <text x="560" y="340" text-anchor="middle" font-size="11" fill="#777">all cells, study samples included</text>
+  <rect x="730" y="196" width="200" height="70" rx="8" fill="#e3f2fd" stroke="#0072B2" stroke-width="2"/>
+  <text x="830" y="222" text-anchor="middle" font-family="Menlo, Consolas, monospace" font-weight="bold" fill="#0b4f7c">bn_apply()</text>
+  <text x="830" y="242" text-anchor="middle" font-size="11" fill="#333">per cell: node shift, then a</text>
+  <text x="830" y="256" text-anchor="middle" font-size="11" fill="#333">quantile map where fitted</text>
+  <path d="M830,266 L830,295" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <rect x="740" y="300" width="180" height="40" rx="8" fill="#ffffff" stroke="#0072B2" stroke-width="1.5"/>
+  <text x="830" y="325" text-anchor="middle" font-size="12" fill="#333">corrected data</text>
+  <text x="830" y="70" text-anchor="middle" font-size="11" fill="#555">Anchor cells stay unchanged.</text>
+  <text x="830" y="85" text-anchor="middle" font-size="11" fill="#555">Batches sharing no bridge donor</text>
+  <text x="830" y="100" text-anchor="middle" font-size="11" fill="#555">stay raw and are flagged.</text>
+  <text x="830" y="122" text-anchor="middle" font-size="11" fill="#555">The frozen model applies to new</text>
+  <text x="830" y="137" text-anchor="middle" font-size="11" fill="#555">data without changing earlier</text>
+  <text x="830" y="152" text-anchor="middle" font-size="11" fill="#555">corrections; a new batch gets</text>
+  <text x="830" y="167" text-anchor="middle" font-size="11" fill="#555">node shifts only.</text>
+</svg>

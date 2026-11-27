@@ -119,7 +119,7 @@ table(res$actions$batch, res$actions$reason_code)
 
 ### Density plots
 
-The density of M in study cells per batch, before and after correction. After correction, batch b3 lies on the anchor b1. Batch b2 moves to the anchor's peaks, but its peaks stay narrower than b1's: with `shrink_k = 300`, each node's quantile curve is pulled part of the way toward the batch-wide curve, so the compression in b2 is only partly undone. A smaller `shrink_k` trusts each node's own curve more.
+The density of M in study cells per batch, before and after correction. After correction, batches b2 and b3 lie on the anchor b1, their peaks at the anchor's width. Each node's quantile map is pulled toward the batch-wide map (`shrink_k = 1000`, so small nodes borrow most). The pull is toward the batch-wide map evaluated at the node's own values (`shrink_target = "value"`), so a stretch or compression shared by all nodes, as in b2 and b3, is kept. A smaller `shrink_k` trusts each node's own map more.
 
 ```{r density}
 study <- is.na(samples$reference_id[match(cells$sample_id, samples$sample_id)])

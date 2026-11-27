@@ -13,17 +13,19 @@ The differences between bridge samples measure the technical batch effect. bridg
 `bn_fit()` is the main method. It works on reference cells only, in two passes:
 
 1. A global paired shift places the bridge cells, and a self-organising map (SOM) on the mapping markers splits them into nodes (cell states). Each batch gets a paired shift per node: the mean over shared bridge donors of the batch-minus-anchor donor means.
-2. The global shift, map and node shifts are refitted on the pass-1 cells. In each (batch, node), the batch's marker quantiles are mapped onto the anchor's; cells without a map take the pass-2 node shift. This corrects changes in the shape of a distribution, not only its location. Every node's offset curve is shrunk toward the batch-wide curve, keeping weight n / (n + `shrink_k`), so small nodes borrow most.
+2. The global shift, map and node shifts are refitted on the pass-1 cells. In each (batch, node), the batch's marker quantiles are mapped onto the anchor's; cells without a map take the pass-2 node shift. This corrects changes in the shape of a distribution, not only its location. Every node's map is shrunk toward the batch-wide map, keeping weight n / (n + `shrink_k`) on its own, so small nodes borrow most. Since 1.1.0 the batch-wide map is read at the node's own values (`shrink_target = "value"`, `shrink_k = 1000`), so a stretch shared by all nodes is kept.
 
 ![The two passes inside bn_fit(): SOM nodes and paired shifts, a refitted map, per-node quantile maps, and shrinkage of small nodes](man/figures/schematic-method.svg)
 
 Only batches whose bridge donors equal the anchor's get quantile maps; other bridged batches get node shifts only, and `bn_fit()` warns which. A batch that shares no bridge donor with the anchor is left raw, and `bn_apply()` says so.
 
-Three options are off by default.
+These options are off by default.
 
 - `target = "virtual"` corrects every batch, the anchor included, toward a virtual reference. Per SOM node, the reference is the equal-weight mean of the batches' quantile curves. Its benefit over the anchor target was not consistent across benchmarks, so the default stays `target = "anchor"`. It does not combine with `shrink_k = "eb"`.
 - `goal_batches`, with `target = "virtual"`, restricts that mean to a chosen set of batches, for example the batches of one study, like CytoNorm's goal distribution. No benchmark benefit is claimed yet.
 - `shrink_k = "eb"` estimates one pseudo-count per marker by empirical Bayes, never below 300. It is kept for study; in benchmarks it did not beat the scalar default.
+- `shrink_reweight = TRUE` builds each batch-wide map with the target's cell-state mix of bridge cells, for batches whose bridges differ in mix.
+- `quantile_maps = FALSE` keeps node shifts only, as an ablation.
 
 `bn_fit_paired()` fits the baseline: one paired shift per population and marker, with no nodes and no quantile maps. Every other model must beat it.
 

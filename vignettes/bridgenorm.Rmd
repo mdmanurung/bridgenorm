@@ -17,7 +17,7 @@ In a multi-batch cytometry study, the same reference material (a bridge sample) 
 
 ![](../man/figures/schematic-workflow.svg){width=100%}
 
-`bn_fit()` works in two passes. A global paired shift places the bridge cells on a self-organising map (SOM), and a paired shift is estimated per node. The shift, map and node shifts are refitted on the shifted cells. In each batch and node, the batch's marker quantiles are then mapped onto the anchor's, and each node's offset curve is shrunk toward the batch-wide curve, small nodes most.
+`bn_fit()` works in two passes. A global paired shift places the bridge cells on a self-organising map (SOM), and a paired shift is estimated per node. The shift, map and node shifts are refitted on the shifted cells. In each batch and node, the batch's marker quantiles are then mapped onto the anchor's, and each node's map is shrunk toward the batch-wide map, small nodes most.
 
 ![](../man/figures/schematic-method.svg){width=100%}
 

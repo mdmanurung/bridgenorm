@@ -148,11 +148,14 @@ Steps, all on reference cells only:
     \code{quantile_probs} of every marker (\code{stats::quantile()},
     type 7) are stored.
   \item Shrinkage: in each such (batch, node) of a non-anchor batch whose
-    node also has anchor quantiles, the offset curve (batch minus anchor
-    quantiles) is pulled toward the batch-wide offset curve (quantiles of
-    all the batch's pass-1 reference cells minus the anchor's), with weight
-    \eqn{n / (n + shrink_k)} on the node's own curve, \eqn{n} being the
-    batch's reference cells in the node. Each column of a shrunk table is
+    node also has anchor quantiles, the node's batch quantiles are pulled
+    toward what the batch-wide map (built from all the batch's pass-1
+    reference cells and the anchor's) predicts for the node, with weight
+    \eqn{n / (n + shrink_k)} on the node's own quantiles, \eqn{n} being the
+    batch's reference cells in the node. With \code{shrink_target =
+    "value"} (default) the batch-wide map is read at the node's anchor
+    quantiles; with \code{"quantile"} the batch-wide offset at the same
+    probability is added to them. Each column of a shrunk table is
     then sorted (rearrangement; Chernozhukov, Fernandez-Val and Galichon
     2010), because the mix can cross itself. \code{shrink_k = 0} keeps the
     fitted tables.
